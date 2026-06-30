@@ -9,6 +9,7 @@ import {
 } from '../controllers/entreprise.controller'
 import { uploadLogoEntreprise, getLogoEntreprise } from '../controllers/logo.controller'
 import { requireAuth, requireSuperAdmin } from '../middlewares/auth.middleware'
+import { asyncHandler } from '../utils/asyncHandler'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -26,12 +27,12 @@ const router = Router()
 
 router.use(requireAuth, requireSuperAdmin)
 
-router.post('/', createEntreprise)
-router.get('/', getAllEntreprises)
-router.get('/:id', getEntrepriseById)
-router.put('/:id', updateEntreprise)
-router.patch('/:id/statut', toggleEntrepriseStatut)
-router.get('/:id/logo', getLogoEntreprise)
-router.patch('/:id/logo', upload.single('logo'), uploadLogoEntreprise)
+router.post('/', asyncHandler(createEntreprise))
+router.get('/', asyncHandler(getAllEntreprises))
+router.get('/:id', asyncHandler(getEntrepriseById))
+router.put('/:id', asyncHandler(updateEntreprise))
+router.patch('/:id/statut', asyncHandler(toggleEntrepriseStatut))
+router.get('/:id/logo', asyncHandler(getLogoEntreprise))
+router.patch('/:id/logo', upload.single('logo'), asyncHandler(uploadLogoEntreprise))
 
 export default router

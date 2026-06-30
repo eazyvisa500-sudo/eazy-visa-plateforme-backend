@@ -2,6 +2,7 @@ import type { Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import prisma from '../lib/prismaClient'
+import { BadRequestError, UnauthorizedError, ForbiddenError, AppError } from '../utils/AppError'
 
 export const loginSuperAdmin = async (req: Request, res: Response): Promise<void> => {
   const { email, mot_de_passe } = req.body as { email: string; mot_de_passe: string }
@@ -11,18 +12,15 @@ export const loginSuperAdmin = async (req: Request, res: Response): Promise<void
   const jwtSecret = process.env['JWT_SECRET']
 
   if (!adminEmail || !adminPassword || !jwtSecret) {
-    res.status(500).json({ message: 'Configuration serveur manquante' })
-    return
+    throw new AppError('Configuration serveur manquante', 500, 'CONFIG_MISSING')
   }
 
   if (!email || !mot_de_passe) {
-    res.status(400).json({ message: 'Email et mot de passe requis' })
-    return
+    throw new BadRequestError('Email et mot de passe requis', 'MISSING_CREDENTIALS')
   }
 
   if (email !== adminEmail || mot_de_passe !== adminPassword) {
-    res.status(401).json({ message: 'Email ou mot de passe incorrect' })
-    return
+    throw new UnauthorizedError('Email ou mot de passe incorrect', 'INVALID_CREDENTIALS')
   }
 
   const token = jwt.sign(
@@ -42,56 +40,47 @@ export const loginSuperAdmin = async (req: Request, res: Response): Promise<void
 }
 
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { email, mot_de_passe } = req.body as { email: string; mot_de_passe: string }
+  const { email, mot_de_passe } = req.body as { email: string; mot_de_passe: string }
 
-    const jwtSecret = process.env['JWT_SECRET']
-    if (!jwtSecret) {
-      res.status(500).json({ message: 'Configuration JWT manquante' })
-      return
-    }
-
-    if (!email || !mot_de_passe) {
-      res.status(400).json({ message: 'Email et mot de passe requis' })
-      return
-    }
-
-    const user = await prisma.user.findUnique({ where: { email } })
-    if (!user) {
-      res.status(401).json({ message: 'Email ou mot de passe incorrect' })
-      return
-    }
-
-    const isValid = await bcrypt.compare(mot_de_passe, user.mot_de_passe)
-    if (!isValid) {
-      res.status(401).json({ message: 'Email ou mot de passe incorrect' })
-      return
-    }
-
-    if (user.is_block) {
-      res.status(403).json({ message: 'Compte bloqué. Contactez votre administrateur.' })
-      return
-    }
-
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, entrepriseId: user.entrepriseId },
-      jwtSecret,
-      { expiresIn: '24h' }
-    )
-
-    res.status(200).json({
-      message: 'Connexion réussie',
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        prenom: user.prenom,
-        nom: user.nom,
-        role: user.role,
-        entrepriseId: user.entrepriseId,
-      },
-    })
-  } catch (error: unknown) {
-    res.status(500).json({ message: 'Erreur serveur', error })
+  const jwtSecret = process.env['JWT_SECRET']
+  if (!jwtSecret) {
+    throw new AppError('Configuration JWT manquante', 500, 'CONFIG_MISSING')
   }
+
+  if (!email || !mot_de_passe) {
+    throw new BadRequestError('Email et mot de passe requis', 'MISSING_CREDENTIALS')
+  }
+
+  const user = await prisma.user.findUnique({ where: { email } })
+  if (!user) {
+    throw new UnauthorizedError('Email ou mot de passe incorrect', 'INVALID_CREDENTIALS')
+  }
+
+  const isValid = await bcrypt.compare(mot_de_passe, user.mot_de_passe)
+  if (!isValid) {
+    throw new UnauthorizedError('Email ou mot de passe incorrect', 'INVALID_CREDENTIALS')
+  }
+
+  if (user.is_block) {
+    throw new ForbiddenError('Compte bloqué. Contactez votre administrateur.', 'ACCOUNT_BLOCKED')
+  }
+
+  const token = jwt.sign(
+    { id: user.id, email: user.email, role: user.role, entrepriseId: user.entrepriseId },
+    jwtSecret,
+    { expiresIn: '24h' }
+  )
+
+  res.status(200).json({
+    message: 'Connexion réussie',
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      prenom: user.prenom,
+      nom: user.nom,
+      role: user.role,
+      entrepriseId: user.entrepriseId,
+    },
+  })
 }
