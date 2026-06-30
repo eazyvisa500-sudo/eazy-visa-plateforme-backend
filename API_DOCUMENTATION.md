@@ -464,7 +464,523 @@ Supprimer un département *(impossible s'il contient encore des employés).*
 
 ---
 
-## 4. Employés
+## 4. Budgets Annuels
+
+> **Accès requis** : Token `SUPERADMIN` ou `MANAGER` (uniquement sa propre entreprise).  
+> Un MANAGER ne peut créer, modifier, supprimer ou consulter que les budgets de son entreprise.
+
+### POST `/api/budgets-annuels`
+
+Créer un budget annuel pour une entreprise. La `reference` (8 caractères alphanum. majuscule) est **auto-générée et unique**.
+
+**Accès** : SUPERADMIN ou MANAGER
+
+**Body**
+```json
+{
+  "identifiant_entreprise": "B7K2MX",
+  "annee": 2026,
+  "date_debut": "2026-01-01",
+  "date_fin": "2026-12-31",
+  "budget": 50000000
+}
+```
+
+> Pour un **SUPERADMIN**, `identifiant_entreprise` ou `entrepriseId` est requis.  
+> Pour un **MANAGER**, l'entreprise est automatiquement déduite du token JWT.
+
+**Réponse 201**
+```json
+{
+  "message": "Budget annuel créé avec succès",
+  "budgetAnnuel": {
+    "id": 1,
+    "reference": "X7B9K2M1",
+    "identifiant_entreprise": "B7K2MX",
+    "annee": 2026,
+    "date_debut": "2026-01-01T00:00:00.000Z",
+    "date_fin": "2026-12-31T00:00:00.000Z",
+    "budget": "50000000",
+    "est_active": false,
+    "est_cloture": false,
+    "createdAt": "2026-06-30T15:00:00.000Z"
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | annee, date_debut, date_fin et budget sont requis |
+| 400 | identifiant_entreprise ou entrepriseId requis (SUPERADMIN) |
+| 403 | Aucune entreprise associée à ce compte |
+| 404 | Entreprise non trouvée |
+
+---
+
+### GET `/api/budgets-annuels`
+
+Lister les budgets annuels.
+
+**Accès** : SUPERADMIN (tous) ou MANAGER (uniquement son entreprise)
+
+**Réponse 200**
+```json
+{
+  "total": 2,
+  "budgets": [
+    {
+      "id": 1,
+      "reference": "X7B9K2M1",
+      "identifiant_entreprise": "B7K2MX",
+      "annee": 2026,
+      "date_debut": "2026-01-01T00:00:00.000Z",
+      "date_fin": "2026-12-31T00:00:00.000Z",
+      "budget": "50000000",
+      "est_active": true,
+      "est_cloture": false,
+      "createdAt": "2026-06-30T15:00:00.000Z",
+      "entreprise": { "id": 1, "nom": "Acme Corp", "identifiant": "B7K2MX" },
+      "_count": { "budgetDepartements": 3, "budgetPersonnels": 10 }
+    }
+  ]
+}
+```
+
+---
+
+### GET `/api/budgets-annuels/:id`
+
+Récupérer un budget annuel avec ses budgets départementaux et personnels.
+
+**Accès** : SUPERADMIN ou MANAGER
+
+**Paramètre URL** : `id` (entier)
+
+**Réponse 200**
+```json
+{
+  "id": 1,
+  "reference": "X7B9K2M1",
+  "identifiant_entreprise": "B7K2MX",
+  "annee": 2026,
+  "date_debut": "2026-01-01T00:00:00.000Z",
+  "date_fin": "2026-12-31T00:00:00.000Z",
+  "budget": "50000000",
+  "est_active": true,
+  "est_cloture": false,
+  "createdAt": "2026-06-30T15:00:00.000Z",
+  "entreprise": { "id": 1, "nom": "Acme Corp", "identifiant": "B7K2MX" },
+  "budgetDepartements": [
+    {
+      "id": 1,
+      "reference": "X7B9K2M1",
+      "departementId": 1,
+      "montant_alloue": "15000000",
+      "montant_utilise": "2000000",
+      "montant_restant": "13000000",
+      "createdAt": "2026-06-30T15:00:00.000Z",
+      "departement": { "id": 1, "nom": "Ressources Humaines" }
+    }
+  ],
+  "budgetPersonnels": [
+    {
+      "id": 1,
+      "reference": "X7B9K2M1",
+      "matricule": "A3T9KL",
+      "montant_alloue": "500000",
+      "montant_utilise": "50000",
+      "montant_restant": "450000",
+      "createdAt": "2026-06-30T15:00:00.000Z",
+      "user": { "id": 1, "prenom": "Awa", "nom": "Diallo", "matricule": "A3T9KL" }
+    }
+  ]
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Budget annuel non trouvé |
+
+---
+
+### PUT `/api/budgets-annuels/:id`
+
+Modifier un budget annuel. Impossible si le budget est **clôturé**.
+
+**Accès** : SUPERADMIN ou MANAGER
+
+**Paramètre URL** : `id` (entier)
+
+**Body** *(tous optionnels)*
+```json
+{
+  "annee": 2027,
+  "date_debut": "2027-01-01",
+  "date_fin": "2027-12-31",
+  "budget": 60000000
+}
+```
+
+**Réponse 200**
+```json
+{
+  "message": "Budget annuel mis à jour",
+  "budgetAnnuel": { ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Budget annuel non trouvé |
+| 409 | Impossible de modifier un budget annuel clôturé |
+
+---
+
+### DELETE `/api/budgets-annuels/:id`
+
+Supprimer un budget annuel. Impossible s'il est lié à des budgets départementaux ou personnels.
+
+**Accès** : SUPERADMIN ou MANAGER
+
+**Paramètre URL** : `id` (entier)
+
+**Réponse 200**
+```json
+{ "message": "Budget annuel supprimé avec succès" }
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Budget annuel non trouvé |
+| 409 | Impossible de supprimer : ce budget est lié à des budgets départementaux ou personnels |
+
+---
+
+### PATCH `/api/budgets-annuels/:id/activer`
+
+Activer un budget annuel. Impossible s'il est déjà activé ou clôturé.
+
+**Accès** : SUPERADMIN ou MANAGER
+
+**Paramètre URL** : `id` (entier)
+
+**Réponse 200**
+```json
+{
+  "message": "Budget annuel activé",
+  "budgetAnnuel": { "id": 1, "est_active": true, ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Budget annuel non trouvé |
+| 409 | Ce budget annuel est déjà activé |
+| 409 | Impossible d'activer un budget annuel clôturé |
+
+---
+
+### PATCH `/api/budgets-annuels/:id/cloturer`
+
+Clôturer un budget annuel. Le budget doit être **activé** et ne pas être déjà clôturé.
+
+**Accès** : SUPERADMIN ou MANAGER
+
+**Paramètre URL** : `id` (entier)
+
+**Réponse 200**
+```json
+{
+  "message": "Budget annuel clôturé",
+  "budgetAnnuel": { "id": 1, "est_cloture": true, ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Budget annuel non trouvé |
+| 409 | Impossible de clôturer un budget annuel non activé |
+| 409 | Ce budget annuel est déjà clôturé |
+
+---
+
+## 4.1 Allocation des budgets
+
+> Ces endpoints permettent d'allouer le budget annuel aux départements et aux personnels.  
+> Le `montant_restant` du budget annuel et des budgets départementaux est mis à jour automatiquement.  
+> **Accès** : SUPERADMIN ou MANAGER (uniquement sa propre entreprise).
+
+### POST `/api/budgets-annuels/:reference/departements`
+
+Allouer un budget à un département à partir d'un budget annuel.
+
+**Paramètre URL** : `reference` du budget annuel (ex: `X7B9K2M1`)
+
+**Body**
+```json
+{
+  "departementId": 1,
+  "montant_alloue": 15000000
+}
+```
+
+**Réponse 201**
+```json
+{
+  "message": "Budget département alloué avec succès",
+  "budgetDepartement": {
+    "id": 1,
+    "reference": "X7B9K2M1",
+    "departementId": 1,
+    "montant_alloue": "15000000",
+    "montant_utilise": "0",
+    "montant_restant": "15000000",
+    "createdAt": "2026-06-30T15:00:00.000Z"
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | departementId et montant_alloue sont requis |
+| 400 | montant_alloue doit être un nombre positif |
+| 403 | Accès non autorisé |
+| 404 | Budget annuel non trouvé |
+| 404 | Département non trouvé |
+| 409 | Le budget annuel doit être activé pour allouer |
+| 409 | Impossible d'allouer sur un budget clôturé |
+| 409 | Ce département a déjà un budget alloué pour cette référence |
+| 409 | Montant alloué supérieur au restant du budget annuel |
+
+---
+
+### POST `/api/budgets-annuels/:reference/personnels`
+
+Allouer un budget à un personnel. Deux modes possibles :
+
+- **Direct** (depuis le budget annuel) : ne pas fournir `departementId`
+- **Via département** : fournir `departementId` pour prélever sur le budget du département
+
+**Paramètre URL** : `reference` du budget annuel
+
+**Body**
+```json
+{
+  "matricule": "A3T9KL",
+  "montant_alloue": 500000,
+  "departementId": 1
+}
+```
+
+> `departementId` est **optionnel**. S'il est fourni, le montant est prélevé sur le budget du département (l'utilisateur doit appartenir à ce département).
+
+**Réponse 201 — via département**
+```json
+{
+  "message": "Budget personnel alloué via département avec succès",
+  "budgetPersonnel": {
+    "id": 1,
+    "reference": "X7B9K2M1",
+    "matricule": "A3T9KL",
+    "montant_alloue": "500000",
+    "montant_utilise": "0",
+    "montant_restant": "500000",
+    "createdAt": "2026-06-30T15:00:00.000Z"
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | matricule et montant_alloue sont requis |
+| 400 | montant_alloue doit être un nombre positif |
+| 403 | Accès non autorisé |
+| 404 | Budget annuel non trouvé |
+| 404 | Utilisateur non trouvé |
+| 404 | Budget département non trouvé (si departementId fourni) |
+| 409 | Le budget annuel doit être activé pour allouer |
+| 409 | Impossible d'allouer sur un budget clôturé |
+| 409 | Cet utilisateur a déjà un budget alloué pour cette référence |
+| 409 | L'utilisateur n'appartient pas au département spécifié |
+| 409 | Montant alloué supérieur au restant |
+
+---
+
+### GET `/api/budgets-annuels/:reference/departements`
+
+Lister les budgets départementaux d'un budget annuel.
+
+**Paramètre URL** : `reference`
+
+**Réponse 200**
+```json
+{
+  "total": 2,
+  "budgets": [
+    {
+      "id": 1,
+      "reference": "X7B9K2M1",
+      "departementId": 1,
+      "montant_alloue": "15000000",
+      "montant_utilise": "2000000",
+      "montant_restant": "13000000",
+      "createdAt": "2026-06-30T15:00:00.000Z",
+      "departement": { "id": 1, "nom": "Ressources Humaines" }
+    }
+  ]
+}
+```
+
+---
+
+### GET `/api/budgets-annuels/:reference/personnels`
+
+Lister les budgets personnels d'un budget annuel.
+
+**Paramètre URL** : `reference`
+
+**Réponse 200**
+```json
+{
+  "total": 2,
+  "budgets": [
+    {
+      "id": 1,
+      "reference": "X7B9K2M1",
+      "matricule": "A3T9KL",
+      "montant_alloue": "500000",
+      "montant_utilise": "50000",
+      "montant_restant": "450000",
+      "createdAt": "2026-06-30T15:00:00.000Z",
+      "user": {
+        "id": 1,
+        "prenom": "Awa",
+        "nom": "Diallo",
+        "matricule": "A3T9KL",
+        "departement": { "id": 1, "nom": "Ressources Humaines" }
+      }
+    }
+  ]
+}
+```
+
+---
+
+### PUT `/api/budgets-annuels/departements/:id`
+
+Modifier le montant alloué d'un budget département.
+
+**Paramètre URL** : `id` (entier)
+
+**Body**
+```json
+{ "montant_alloue": 20000000 }
+```
+
+**Réponse 200**
+```json
+{
+  "message": "Budget département mis à jour",
+  "budgetDepartement": { ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Budget département non trouvé |
+| 409 | Impossible de modifier sur un budget clôturé |
+| 409 | Augmentation supérieure au restant du budget annuel |
+| 409 | Le nouveau montant ne peut pas être inférieur au montant déjà utilisé |
+
+---
+
+### DELETE `/api/budgets-annuels/departements/:id`
+
+Supprimer un budget département (impossible s'il a des budgets personnels liés).
+
+**Paramètre URL** : `id` (entier)
+
+**Réponse 200**
+```json
+{ "message": "Budget département supprimé avec succès" }
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Budget département non trouvé |
+| 409 | Impossible de supprimer sur un budget clôturé |
+| 409 | Impossible de supprimer : des budgets personnels sont liés à ce budget annuel |
+
+---
+
+### PUT `/api/budgets-annuels/personnels/:id`
+
+Modifier le montant alloué d'un budget personnel.
+
+**Paramètre URL** : `id` (entier)
+
+**Body**
+```json
+{ "montant_alloue": 750000 }
+```
+
+**Réponse 200**
+```json
+{
+  "message": "Budget personnel mis à jour",
+  "budgetPersonnel": { ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Budget personnel non trouvé |
+| 409 | Impossible de modifier sur un budget clôturé |
+| 409 | Augmentation supérieure au restant |
+| 409 | Le nouveau montant ne peut pas être inférieur au montant déjà utilisé |
+
+---
+
+### DELETE `/api/budgets-annuels/personnels/:id`
+
+Supprimer un budget personnel.
+
+**Paramètre URL** : `id` (entier)
+
+**Réponse 200**
+```json
+{ "message": "Budget personnel supprimé avec succès" }
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Budget personnel non trouvé |
+| 409 | Impossible de supprimer sur un budget clôturé |
+
+---
+
+## 5. Employés
 
 ### POST `/api/employes`
 
@@ -770,6 +1286,7 @@ Supprimer définitivement un employé.
 |---|---|---|---|
 | `identifiant` | Entreprise | 6 car. `[A-Z0-9]` | `B7K2MX` |
 | `matricule` | User (Employé) | 6 car. `[A-Z0-9]` | `A3T9KL` |
+| `reference` | BudgetAnnuel | 8 car. `[A-Z0-9]` | `X7B9K2M1` |
 
 L'unicité est garantie à deux niveaux :
 - **Applicatif** : vérification en boucle avant insertion + exclusion intra-lot
