@@ -25,6 +25,7 @@ model Entreprise {
   users         User[]
   budgetsAnnuels BudgetAnnuel[]
   departements   Departement[]
+  demandesVoyage DemandeVoyage[]
 
   @@map("entreprises")
 }
@@ -87,6 +88,7 @@ model User {
   departement     Departement      @relation(fields: [departementId], references: [id])
   budgetPersonnels BudgetPersonnel[]
   politique       Politique?
+  demandesVoyage  DemandeVoyage[]
 
   @@map("users")
 }
@@ -158,4 +160,111 @@ model Politique {
   user      User     @relation(fields: [matricule], references: [matricule])
 
   @@map("politiques")
+}
+
+enum StatutDemande {
+  EN_ATTENTE
+  APPROUVEE
+  REJETEE
+  ANNULEE
+  EN_COURS
+  TERMINEE
+}
+
+enum StatutReservation {
+  EN_ATTENTE
+  CONFIRMEE
+  EMISE
+  ANNULEE
+  REMBOURSEE
+}
+
+enum StatutReservationHotel {
+  EN_ATTENTE
+  CONFIRMEE
+  ANNULEE
+  REMBOURSEE
+}
+
+model DemandeVoyage {
+  id                     Int           @id @default(autoincrement())
+  matricule              String
+  identifiant_entreprise String
+  depart                 String
+  arrive                 String
+  allerRetour            Boolean       @default(false) // true = A/R, false = aller simple
+  dateDepart             DateTime
+  dateRetour             DateTime?
+  classe                 String        @default("Y") // Y=Economique, W=Premium, J=Affaires, F=Premiere
+  hotel                  String        @default("NON_INCLUS") // 1,2,3,4,5 ou NON_INCLUS
+  ville                  String?
+  pays                   String?
+  etat                   String?
+  region                 String?
+  motif                  String
+  statut                 StatutDemande @default(EN_ATTENTE)
+  commentaire            String?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  user       User       @relation(fields: [matricule], references: [matricule])
+  entreprise Entreprise @relation(fields: [identifiant_entreprise], references: [identifiant])
+  reservationBillet ReservationBillet?
+  reservationHotel  ReservationHotel?
+
+  @@map("demande_voyages")
+}
+
+model ReservationBillet {
+  id                    Int           @id @default(autoincrement())
+  demandeVoyageId       Int           @unique
+  allerRetour           Boolean       @default(false)
+  numeroReservation     String        @unique
+  compagnieAerienne     String?
+  numeroVolAller        String?
+  numeroVolRetour       String?
+  dateVolDepart         DateTime?
+  dateVolArrivee        DateTime?
+  dateVolRetourDepart   DateTime?
+  dateVolRetourArrivee  DateTime?
+  aeroportDepart        String?
+  aeroportArrivee       String?
+  classe                String        @default("Y")
+  prix                  Decimal?
+  devise                String        @default("XOF")
+  statut                StatutReservation @default(EN_ATTENTE)
+  numeroBillet          String?       @unique
+  dateEmission          DateTime?
+  commentaire           String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  demandeVoyage         DemandeVoyage @relation(fields: [demandeVoyageId], references: [id])
+
+  @@map("reservation_billets")
+}
+
+model ReservationHotel {
+  id                    Int           @id @default(autoincrement())
+  demandeVoyageId       Int           @unique
+  nomHotel              String?
+  categorie             String?
+  adresse               String?
+  ville                 String?
+  pays                  String?
+  dateArrivee           DateTime?
+  dateDepart            DateTime?
+  nombreNuits           Int?
+  prixParNuit           Decimal?
+  prixTotal             Decimal?
+  devise                String        @default("XOF")
+  statut                StatutReservationHotel @default(EN_ATTENTE)
+  numeroConfirmation    String?       @unique
+  commentaire           String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  demandeVoyage         DemandeVoyage @relation(fields: [demandeVoyageId], references: [id])
+
+  @@map("reservation_hotels")
 }

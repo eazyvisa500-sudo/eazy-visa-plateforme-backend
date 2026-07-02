@@ -1742,7 +1742,646 @@ Supprimer la politique de voyage d'un employé.
 
 ---
 
-## 6. Employés
+## 6. Demandes de voyage
+
+Gestion des demandes de voyage des employés avec validation des politiques de classe et workflow d'approbation.
+
+**Accès**
+- `SUPERADMIN` : toutes les demandes
+- `MANAGER` : demandes de son entreprise uniquement (peut approuver/rejeter)
+- `EMPLOYE` / `CONSULTANT` : ses propres demandes uniquement
+
+### POST `/api/demandes-voyage`
+
+Créer une demande de voyage.
+
+**Headers**
+```
+Authorization: Bearer <token>
+```
+
+**Body**
+```json
+{
+  "depart": "Dakar",
+  "arrive": "Paris",
+  "allerRetour": true,
+  "dateDepart": "2026-08-01T10:00:00.000Z",
+  "dateRetour": "2026-08-10T10:00:00.000Z",
+  "classe": "J",
+  "hotel": "4",
+  "ville": "Paris",
+  "pays": "France",
+  "etat": "Île-de-France",
+  "region": "Paris",
+  "motif": "Réunion client"
+}
+```
+
+> **Note** : `matricule` et `identifiant_entreprise` sont automatiquement extraits du token JWT de l'utilisateur connecté.
+> `hotel` est optionnel. Valeurs acceptées : `1`, `2`, `3`, `4`, `5`, `NON_INCLUS`. Par défaut : `NON_INCLUS`.
+> `ville`, `pays`, `etat`, `region` sont optionnels.
+
+**Réponse 201**
+```json
+{
+  "message": "Demande de voyage créée",
+  "demande": {
+    "id": 1,
+    "matricule": "AB1234",
+    "identifiant_entreprise": "ENT001",
+    "depart": "Dakar",
+    "arrive": "Paris",
+    "allerRetour": true,
+    "dateDepart": "2026-08-01T10:00:00.000Z",
+    "dateRetour": "2026-08-10T10:00:00.000Z",
+    "classe": "J",
+    "hotel": "4",
+    "ville": "Paris",
+    "pays": "France",
+    "etat": "Île-de-France",
+    "region": "Paris",
+    "motif": "Réunion client",
+    "statut": "EN_ATTENTE",
+    "createdAt": "2026-07-02T12:00:00.000Z"
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | Champs requis manquants |
+| 400 | Informations utilisateur manquantes dans le token |
+| 400 | Hotel doit être 1, 2, 3, 4, 5 ou NON_INCLUS |
+| 400 | dateRetour est requis pour un aller-retour |
+| 404 | Employé ou entreprise non trouvé(e) |
+| 409 | La classe demandée n'est pas autorisée par la politique de l'employé |
+
+---
+
+### GET `/api/demandes-voyage/mes-demandes`
+
+Lister ses propres demandes de voyage (pour EMPLOYE/CONSULTANT).
+
+**Réponse 200**
+```json
+{
+  "total": 3,
+  "demandes": [
+    {
+      "id": 1,
+      "depart": "Dakar",
+      "arrive": "Paris",
+      "statut": "EN_ATTENTE",
+      "classe": "J",
+      "dateDepart": "2026-08-01T10:00:00.000Z",
+      "createdAt": "2026-07-02T12:00:00.000Z",
+      "entreprise": { "id": 1, "nom": "Eazy Visa", "identifiant": "ENT001" }
+    }
+  ]
+}
+```
+
+---
+
+### GET `/api/demandes-voyage`
+
+Lister toutes les demandes de voyage (manager/superadmin).
+
+**Réponse 200**
+```json
+{
+  "total": 5,
+  "demandes": [
+    {
+      "id": 1,
+      "matricule": "AB1234",
+      "depart": "Dakar",
+      "arrive": "Paris",
+      "statut": "EN_ATTENTE",
+      "user": { "id": 5, "prenom": "Jean", "nom": "Dupont", "matricule": "AB1234", "role": "EMPLOYE" },
+      "entreprise": { "id": 1, "nom": "Eazy Visa", "identifiant": "ENT001" }
+    }
+  ]
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+
+---
+
+### GET `/api/demandes-voyage/:id`
+
+Récupérer une demande de voyage par son ID.
+
+**Réponse 200**
+```json
+{
+  "demande": {
+    "id": 1,
+    "matricule": "AB1234",
+    "depart": "Dakar",
+    "arrive": "Paris",
+    "allerRetour": true,
+    "dateDepart": "2026-08-01T10:00:00.000Z",
+    "dateRetour": "2026-08-10T10:00:00.000Z",
+    "classe": "J",
+    "motif": "Réunion client",
+    "statut": "EN_ATTENTE",
+    "commentaire": null,
+    "user": { "id": 5, "prenom": "Jean", "nom": "Dupont", "matricule": "AB1234", "role": "EMPLOYE" },
+    "entreprise": { "id": 1, "nom": "Eazy Visa", "identifiant": "ENT001" }
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Demande de voyage non trouvée |
+
+---
+
+### PUT `/api/demandes-voyage/:id`
+
+Modifier une demande (uniquement si statut = `EN_ATTENTE`).
+
+**Body** (tous optionnels)
+```json
+{
+  "depart": "Dakar",
+  "arrive": "Londres",
+  "allerRetour": false,
+  "dateDepart": "2026-08-05T10:00:00.000Z",
+  "classe": "Y",
+  "hotel": "3",
+  "ville": "Londres",
+  "pays": "Royaume-Uni",
+  "etat": "Angleterre",
+  "region": "Londres",
+  "motif": "Formation"
+}
+```
+
+> **Note** : `hotel` est optionnel. Valeurs acceptées : `1`, `2`, `3`, `4`, `5`, `NON_INCLUS`.
+> `ville`, `pays`, `etat`, `region` sont optionnels.
+
+**Réponse 200**
+```json
+{
+  "message": "Demande de voyage mise à jour",
+  "demande": { "id": 1, "classe": "Y", "statut": "EN_ATTENTE", ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | Hotel doit être 1, 2, 3, 4, 5 ou NON_INCLUS |
+| 403 | Accès non autorisé |
+| 404 | Demande non trouvée |
+| 409 | Impossible de modifier une demande qui n'est pas en attente |
+| 409 | La classe demandée n'est pas autorisée par la politique |
+
+---
+
+### PATCH `/api/demandes-voyage/:id/approuver`
+
+Approuver une demande (manager/superadmin).
+
+**Body** (optionnel)
+```json
+{
+  "commentaire": "Approuvé par le manager"
+}
+```
+
+**Réponse 200**
+```json
+{
+  "message": "Demande approuvée",
+  "demande": { "id": 1, "statut": "APPROUVEE", ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Demande non trouvée |
+| 409 | Seules les demandes en attente peuvent être approuvées |
+
+---
+
+### PATCH `/api/demandes-voyage/:id/rejeter`
+
+Rejeter une demande (manager/superadmin).
+
+**Body** (optionnel)
+```json
+{
+  "commentaire": "Budget insuffisant"
+}
+```
+
+**Réponse 200**
+```json
+{
+  "message": "Demande rejetée",
+  "demande": { "id": 1, "statut": "REJETEE", ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Demande non trouvée |
+| 409 | Seules les demandes en attente peuvent être rejetées |
+
+---
+
+### PATCH `/api/demandes-voyage/:id/annuler`
+
+Annuler une demande (créateur, manager ou superadmin).
+
+**Réponse 200**
+```json
+{
+  "message": "Demande annulée",
+  "demande": { "id": 1, "statut": "ANNULEE", ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Demande non trouvée |
+| 409 | Demande déjà annulée ou terminée |
+
+---
+
+### PATCH `/api/demandes-voyage/:id/cloturer`
+
+Clôturer une demande (marquer comme terminée — manager/superadmin).
+
+**Réponse 200**
+```json
+{
+  "message": "Demande clôturée",
+  "demande": { "id": 1, "statut": "TERMINEE", ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Demande non trouvée |
+| 409 | Seules les demandes approuvées ou en cours peuvent être clôturées |
+
+---
+
+## 7. Réservations
+
+### GET `/api/reservations/entreprise`
+
+Lister toutes les réservations (billets et hôtels) de l'entreprise (manager/superadmin).
+
+**Accès** : SUPERADMIN ou MANAGER
+
+**Headers**
+```
+Authorization: Bearer <token>
+```
+
+**Réponse 200**
+```json
+{
+  "billets": {
+    "total": 5,
+    "data": [
+      {
+        "id": 1,
+        "demandeVoyageId": 10,
+        "allerRetour": true,
+        "numeroReservation": "RES-1719876543210",
+        "compagnieAerienne": null,
+        "numeroVolAller": null,
+        "numeroVolRetour": null,
+        "dateVolDepart": "2026-08-01T10:00:00.000Z",
+        "dateVolArrivee": null,
+        "dateVolRetourDepart": "2026-08-10T10:00:00.000Z",
+        "dateVolRetourArrivee": null,
+        "aeroportDepart": "Dakar",
+        "aeroportArrivee": "Paris",
+        "classe": "J",
+        "prix": null,
+        "devise": "XOF",
+        "statut": "EN_ATTENTE",
+        "numeroBillet": null,
+        "dateEmission": null,
+        "commentaire": null,
+        "createdAt": "2026-07-02T14:00:00.000Z",
+        "demandeVoyage": {
+          "id": 10,
+          "matricule": "AB1234",
+          "depart": "Dakar",
+          "arrive": "Paris",
+          "statut": "APPROUVEE",
+          "user": { "id": 5, "prenom": "Jean", "nom": "Dupont", "matricule": "AB1234", "role": "EMPLOYE" },
+          "entreprise": { "id": 1, "nom": "Eazy Visa", "identifiant": "ENT001" }
+        }
+      }
+    ]
+  },
+  "hotels": {
+    "total": 3,
+    "data": [
+      {
+        "id": 1,
+        "demandeVoyageId": 10,
+        "nomHotel": null,
+        "categorie": "4",
+        "adresse": null,
+        "ville": "Paris",
+        "pays": null,
+        "dateArrivee": null,
+        "dateDepart": null,
+        "nombreNuits": null,
+        "prixParNuit": null,
+        "prixTotal": null,
+        "devise": "XOF",
+        "statut": "EN_ATTENTE",
+        "numeroConfirmation": null,
+        "commentaire": null,
+        "createdAt": "2026-07-02T14:00:00.000Z",
+        "demandeVoyage": {
+          "id": 10,
+          "matricule": "AB1234",
+          "depart": "Dakar",
+          "arrive": "Paris",
+          "statut": "APPROUVEE",
+          "user": { "id": 5, "prenom": "Jean", "nom": "Dupont", "matricule": "AB1234", "role": "EMPLOYE" },
+          "entreprise": { "id": 1, "nom": "Eazy Visa", "identifiant": "ENT001" }
+        }
+      }
+    ]
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+
+---
+
+### GET `/api/reservations/mes-reservations`
+
+Lister ses propres réservations (billets et hôtels) pour EMPLOYE/CONSULTANT.
+
+**Accès** : EMPLOYE ou CONSULTANT
+
+**Headers**
+```
+Authorization: Bearer <token>
+```
+
+**Réponse 200**
+```json
+{
+  "billets": {
+    "total": 2,
+    "data": [
+      {
+        "id": 1,
+        "demandeVoyageId": 10,
+        "numeroReservation": "RES-1719876543210",
+        "statut": "EN_ATTENTE",
+        "demandeVoyage": {
+          "id": 10,
+          "matricule": "AB1234",
+          "depart": "Dakar",
+          "arrive": "Paris",
+          "statut": "APPROUVEE"
+        }
+      }
+    ]
+  },
+  "hotels": {
+    "total": 1,
+    "data": [
+      {
+        "id": 1,
+        "demandeVoyageId": 10,
+        "categorie": "4",
+        "ville": "Paris",
+        "statut": "EN_ATTENTE",
+        "demandeVoyage": {
+          "id": 10,
+          "matricule": "AB1234",
+          "statut": "APPROUVEE"
+        }
+      }
+    ]
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+
+---
+
+### GET `/api/reservations/billets/:id`
+
+Récupérer une réservation de billet par son ID.
+
+**Accès** : Tous les rôles (avec contrôle d'accès)
+
+**Headers**
+```
+Authorization: Bearer <token>
+```
+
+**Réponse 200**
+```json
+{
+  "reservation": {
+    "id": 1,
+    "demandeVoyageId": 10,
+    "allerRetour": true,
+    "numeroReservation": "RES-1719876543210",
+    "compagnieAerienne": null,
+    "numeroVolAller": null,
+    "numeroVolRetour": null,
+    "dateVolDepart": "2026-08-01T10:00:00.000Z",
+    "dateVolArrivee": null,
+    "dateVolRetourDepart": "2026-08-10T10:00:00.000Z",
+    "dateVolRetourArrivee": null,
+    "aeroportDepart": "Dakar",
+    "aeroportArrivee": "Paris",
+    "classe": "J",
+    "prix": null,
+    "devise": "XOF",
+    "statut": "EN_ATTENTE",
+    "numeroBillet": null,
+    "dateEmission": null,
+    "commentaire": null,
+    "createdAt": "2026-07-02T14:00:00.000Z",
+    "updatedAt": "2026-07-02T14:00:00.000Z",
+    "demandeVoyage": {
+      "id": 10,
+      "matricule": "AB1234",
+      "identifiant_entreprise": "ENT001",
+      "depart": "Dakar",
+      "arrive": "Paris",
+      "allerRetour": true,
+      "dateDepart": "2026-08-01T10:00:00.000Z",
+      "dateRetour": "2026-08-10T10:00:00.000Z",
+      "classe": "J",
+      "hotel": "4",
+      "ville": "Paris",
+      "motif": "Réunion client",
+      "statut": "APPROUVEE",
+      "commentaire": null,
+      "createdAt": "2026-07-02T12:00:00.000Z",
+      "updatedAt": "2026-07-02T14:00:00.000Z",
+      "user": {
+        "id": 5,
+        "email": "jean.dupont@example.com",
+        "mot_de_passe": "$2b$10$...",
+        "prenom": "Jean",
+        "nom": "Dupont",
+        "role": "EMPLOYE",
+        "matricule": "AB1234",
+        "entrepriseId": 1,
+        "is_block": false,
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z"
+      },
+      "entreprise": {
+        "id": 1,
+        "nom": "Eazy Visa",
+        "identifiant": "ENT001",
+        "email": "contact@eazyvisa.com",
+        "telephone": "+221338000000",
+        "adresse": "Dakar, Sénégal",
+        "pays": "Sénégal",
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z"
+      }
+    }
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Réservation de billet non trouvée |
+
+---
+
+### GET `/api/reservations/hotels/:id`
+
+Récupérer une réservation d'hôtel par son ID.
+
+**Accès** : Tous les rôles (avec contrôle d'accès)
+
+**Headers**
+```
+Authorization: Bearer <token>
+```
+
+**Réponse 200**
+```json
+{
+  "reservation": {
+    "id": 1,
+    "demandeVoyageId": 10,
+    "nomHotel": null,
+    "categorie": "4",
+    "adresse": null,
+    "ville": "Paris",
+    "pays": null,
+    "dateArrivee": null,
+    "dateDepart": null,
+    "nombreNuits": null,
+    "prixParNuit": null,
+    "prixTotal": null,
+    "devise": "XOF",
+    "statut": "EN_ATTENTE",
+    "numeroConfirmation": null,
+    "commentaire": null,
+    "createdAt": "2026-07-02T14:00:00.000Z",
+    "updatedAt": "2026-07-02T14:00:00.000Z",
+    "demandeVoyage": {
+      "id": 10,
+      "matricule": "AB1234",
+      "identifiant_entreprise": "ENT001",
+      "depart": "Dakar",
+      "arrive": "Paris",
+      "allerRetour": true,
+      "dateDepart": "2026-08-01T10:00:00.000Z",
+      "dateRetour": "2026-08-10T10:00:00.000Z",
+      "classe": "J",
+      "hotel": "4",
+      "ville": "Paris",
+      "motif": "Réunion client",
+      "statut": "APPROUVEE",
+      "commentaire": null,
+      "createdAt": "2026-07-02T12:00:00.000Z",
+      "updatedAt": "2026-07-02T14:00:00.000Z",
+      "user": {
+        "id": 5,
+        "email": "jean.dupont@example.com",
+        "mot_de_passe": "$2b$10$...",
+        "prenom": "Jean",
+        "nom": "Dupont",
+        "role": "EMPLOYE",
+        "matricule": "AB1234",
+        "entrepriseId": 1,
+        "is_block": false,
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z"
+      },
+      "entreprise": {
+        "id": 1,
+        "nom": "Eazy Visa",
+        "identifiant": "ENT001",
+        "email": "contact@eazyvisa.com",
+        "telephone": "+221338000000",
+        "adresse": "Dakar, Sénégal",
+        "pays": "Sénégal",
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z"
+      }
+    }
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Réservation d'hôtel non trouvée |
+
+---
+
+## 8. Employés
 
 ### POST `/api/employes`
 

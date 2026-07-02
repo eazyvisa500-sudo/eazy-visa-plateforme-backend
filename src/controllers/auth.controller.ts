@@ -65,8 +65,11 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
     throw new ForbiddenError('Compte bloqué. Contactez votre administrateur.', 'ACCOUNT_BLOCKED')
   }
 
+  const entreprise = await prisma.entreprise.findUnique({ where: { id: user.entrepriseId } })
+  const identifiantEntreprise = entreprise?.identifiant ?? ''
+
   const token = jwt.sign(
-    { id: user.id, email: user.email, role: user.role, entrepriseId: user.entrepriseId, matricule: user.matricule },
+    { id: user.id, email: user.email, role: user.role, entrepriseId: user.entrepriseId, matricule: user.matricule, identifiantEntreprise },
     jwtSecret,
     { expiresIn: '24h' }
   )
@@ -81,6 +84,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       nom: user.nom,
       role: user.role,
       entrepriseId: user.entrepriseId,
+      identifiantEntreprise,
     },
   })
 }
