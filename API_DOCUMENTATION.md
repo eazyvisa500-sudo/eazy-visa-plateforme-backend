@@ -606,6 +606,70 @@ Récupérer un budget annuel avec ses budgets départementaux et personnels.
 
 ---
 
+### GET `/api/budgets-annuels/entreprise/:identifiant`
+
+Lister tous les budgets annuels d'une entreprise (par son identifiant).
+
+**Accès** : SUPERADMIN ou MANAGER (uniquement sa propre entreprise)
+
+**Paramètre URL** : `identifiant` (string, ex: `ENT-2026-001`)
+
+**Réponse 200**
+```json
+{
+  "total": 2,
+  "budgets": [
+    {
+      "id": 1,
+      "reference": "X7B9K2M1",
+      "identifiant_entreprise": "B7K2MX",
+      "annee": 2026,
+      "date_debut": "2026-01-01T00:00:00.000Z",
+      "date_fin": "2026-12-31T00:00:00.000Z",
+      "budget": "50000000",
+      "montant_restant": "35000000",
+      "est_active": true,
+      "est_cloture": false,
+      "createdAt": "2026-06-30T15:00:00.000Z",
+      "entreprise": { "id": 1, "nom": "Acme Corp", "identifiant": "B7K2MX" },
+      "budgetDepartements": [
+        {
+          "id": 1,
+          "reference": "X7B9K2M1",
+          "departementId": 1,
+          "montant_alloue": "15000000",
+          "montant_utilise": "2000000",
+          "montant_restant": "13000000",
+          "createdAt": "2026-06-30T15:00:00.000Z",
+          "departement": { "id": 1, "nom": "Ressources Humaines" }
+        }
+      ],
+      "budgetPersonnels": [
+        {
+          "id": 1,
+          "reference": "X7B9K2M1",
+          "matricule": "A3T9KL",
+          "montant_alloue": "500000",
+          "montant_utilise": "50000",
+          "montant_restant": "450000",
+          "createdAt": "2026-06-30T15:00:00.000Z",
+          "user": { "id": 1, "prenom": "Awa", "nom": "Diallo", "matricule": "A3T9KL" }
+        }
+      ],
+      "_count": { "budgetDepartements": 3, "budgetPersonnels": 5 }
+    }
+  ]
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Entreprise non trouvée |
+
+---
+
 ### PUT `/api/budgets-annuels/:id`
 
 Modifier un budget annuel. Impossible si le budget est **clôturé**.
@@ -977,6 +1041,407 @@ Supprimer un budget personnel.
 | 403 | Accès non autorisé |
 | 404 | Budget personnel non trouvé |
 | 409 | Impossible de supprimer sur un budget clôturé |
+
+---
+
+### POST `/api/budgets-annuels/:reference/augmenter`
+
+Augmenter le budget annuel global (budget + restant).
+
+**Paramètre URL** : `reference`
+
+**Body**
+```json
+{ "montant": 5000000 }
+```
+
+**Réponse 200**
+```json
+{
+  "message": "Budget annuel augmenté",
+  "budgetAnnuel": { "budget": "55000000", "montant_restant": "55000000", ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | montant est requis / doit être un nombre positif |
+| 403 | Accès non autorisé |
+| 404 | Budget annuel non trouvé |
+| 409 | Impossible de modifier un budget clôturé |
+
+---
+
+### POST `/api/budgets-annuels/:reference/diminuer`
+
+Diminuer le budget annuel global (budget + restant).
+
+**Paramètre URL** : `reference`
+
+**Body**
+```json
+{ "montant": 2000000 }
+```
+
+**Réponse 200**
+```json
+{
+  "message": "Budget annuel diminué",
+  "budgetAnnuel": { "budget": "48000000", "montant_restant": "48000000", ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | montant est requis / doit être un nombre positif |
+| 403 | Accès non autorisé |
+| 404 | Budget annuel non trouvé |
+| 409 | Impossible de modifier un budget clôturé |
+| 409 | Diminution supérieure au restant |
+
+---
+
+### POST `/api/budgets-annuels/departements/:id/augmenter`
+
+Augmenter le montant alloué d'un budget département (prélèvement sur le budget annuel).
+
+**Paramètre URL** : `id` (entier)
+
+**Body**
+```json
+{ "montant": 3000000 }
+```
+
+**Réponse 200**
+```json
+{
+  "message": "Budget département augmenté",
+  "budgetDepartement": { "montant_alloue": "18000000", "montant_restant": "18000000", ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | montant est requis / doit être un nombre positif |
+| 403 | Accès non autorisé |
+| 404 | Budget département non trouvé |
+| 409 | Impossible de modifier un budget clôturé |
+| 409 | Augmentation supérieure au restant du budget annuel |
+
+---
+
+### POST `/api/budgets-annuels/departements/:id/diminuer`
+
+Diminuer le montant alloué d'un budget département (retour au budget annuel).
+
+**Paramètre URL** : `id` (entier)
+
+**Body**
+```json
+{ "montant": 1000000 }
+```
+
+**Réponse 200**
+```json
+{
+  "message": "Budget département diminué",
+  "budgetDepartement": { "montant_alloue": "14000000", "montant_restant": "14000000", ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | montant est requis / doit être un nombre positif |
+| 403 | Accès non autorisé |
+| 404 | Budget département non trouvé |
+| 409 | Impossible de modifier un budget clôturé |
+| 409 | Le montant à diminuer ne peut pas être supérieur au restant du budget département |
+
+---
+
+### POST `/api/budgets-annuels/personnels/:id/augmenter`
+
+Augmenter le montant alloué d'un budget personnel.
+
+**Paramètre URL** : `id` (entier)
+
+**Body**
+```json
+{ "montant": 200000 }
+```
+
+**Réponse 200**
+```json
+{
+  "message": "Budget personnel augmenté",
+  "budgetPersonnel": { "montant_alloue": "700000", "montant_restant": "700000", ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | montant est requis / doit être un nombre positif |
+| 403 | Accès non autorisé |
+| 404 | Budget personnel non trouvé |
+| 409 | Impossible de modifier un budget clôturé |
+| 409 | Augmentation supérieure au restant |
+
+---
+
+### POST `/api/budgets-annuels/personnels/:id/diminuer`
+
+Diminuer le montant alloué d'un budget personnel.
+
+**Paramètre URL** : `id` (entier)
+
+**Body**
+```json
+{ "montant": 100000 }
+```
+
+**Réponse 200**
+```json
+{
+  "message": "Budget personnel diminué",
+  "budgetPersonnel": { "montant_alloue": "400000", "montant_restant": "400000", ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | montant est requis / doit être un nombre positif |
+| 403 | Accès non autorisé |
+| 404 | Budget personnel non trouvé |
+| 409 | Impossible de modifier un budget clôturé |
+| 409 | Le montant à diminuer ne peut pas être supérieur au restant du budget personnel |
+
+---
+
+### GET `/api/budgets-annuels/audits`
+
+Consulter l'historique des actions sur les budgets (traçabilité).
+
+**Query params (optionnels)**
+- `reference` : filtrer par référence de budget annuel
+- `action` : filtrer par type d'action (ex: `ALLOUER_BUDGET_DEPARTEMENT`, `AUGMENTER_BUDGET_ANNUEL`)
+- `role_effectue_par` : filtrer par rôle de l'utilisateur (`SUPERADMIN`, `MANAGER`, `ADMIN`)
+- `page` : numéro de page (défaut: 1)
+- `limit` : nombre d'éléments par page (défaut: 50, max: 100)
+
+**Réponse 200**
+```json
+{
+  "total": 120,
+  "page": 1,
+  "limit": 50,
+  "audits": [
+    {
+      "id": 1,
+      "reference": "YH8M3E5J",
+      "entrepriseId": 3,
+      "action": "ALLOUER_BUDGET_DEPARTEMENT",
+      "type_source": "ANNUEL",
+      "type_destination": "DEPARTEMENT",
+      "montant": "10000000",
+      "montant_avant": "50000000",
+      "montant_apres": "40000000",
+      "description": "Budget département alloué : 10000000 pris du budget annuel YH8M3E5J",
+      "effectue_par": "manager@example.com",
+      "effectue_par_id": 5,
+      "target_id": 2,
+      "target_matricule": null,
+      "createdAt": "2025-01-15T10:30:00.000Z"
+    }
+  ]
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+
+---
+
+### GET `/api/budgets-allocation/audits/employe/:matricule`
+
+Retourne tous les logs d'audit liés à un employé ou consultant (actions effectuées sur lui ou par lui).
+
+**Accès**
+- `SUPERADMIN` : tout employé de toutes les entreprises
+- `MANAGER` : employés de sa propre entreprise uniquement
+- `EMPLOYE` / `CONSULTANT` : son propre matricule uniquement
+
+**Paramètre URL** : `matricule` de l'employé/consultant
+
+**Query params (optionnels)**
+- `page` : numéro de page (défaut: 1)
+- `limit` : nombre d'éléments par page (défaut: 50, max: 100)
+
+**Réponse 200**
+```json
+{
+  "total": 3,
+  "page": 1,
+  "limit": 50,
+  "employe": {
+    "id": 5,
+    "prenom": "Jean",
+    "nom": "Dupont",
+    "matricule": "AB1234",
+    "role": "EMPLOYE"
+  },
+  "audits": [
+    {
+      "id": 12,
+      "reference": "BUDGET-2026-ABC",
+      "entrepriseId": 3,
+      "action": "ALLOUER_BUDGET_PERSONNEL",
+      "type_source": "ANNUEL",
+      "type_destination": "PERSONNEL",
+      "montant": "150000",
+      "montant_avant": null,
+      "montant_apres": null,
+      "description": "Budget personnel alloué à AB1234 directement depuis le budget annuel : 150000",
+      "effectue_par": "manager@entreprise.com",
+      "effectue_par_id": 2,
+      "role_effectue_par": "MANAGER",
+      "target_id": null,
+      "target_matricule": "AB1234",
+      "createdAt": "2026-07-01T14:30:00.000Z"
+    },
+    {
+      "id": 15,
+      "reference": "BUDGET-2026-ABC",
+      "action": "AUGMENTER_BUDGET_PERSONNEL",
+      "montant": 20000,
+      "montant_avant": 150000,
+      "montant_apres": 170000,
+      "description": "Budget personnel 3 augmenté de 20000 depuis le budget annuel",
+      "effectue_par": "superadmin@entreprise.com",
+      "role_effectue_par": "SUPERADMIN",
+      "target_matricule": "AB1234",
+      "createdAt": "2026-07-01T15:00:00.000Z"
+    }
+  ]
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé (MANAGER hors de son entreprise, ou EMPLOYE/CONSULTANT consultant un autre matricule) |
+| 404 | Employé non trouvé |
+
+---
+
+### GET `/api/budgets-allocation/mes-budgets`
+
+Retourne tous les budgets personnels alloués à l'utilisateur connecté (employé ou consultant), avec les détails du budget annuel associé.
+
+**Accès** : Tout utilisateur authentifié
+
+**Réponse 200**
+```json
+{
+  "total": 2,
+  "employe": {
+    "id": 5,
+    "prenom": "Jean",
+    "nom": "Dupont",
+    "matricule": "AB1234",
+    "role": "EMPLOYE"
+  },
+  "budgets": [
+    {
+      "id": 3,
+      "reference": "BUDGET-2026-ABC",
+      "matricule": "AB1234",
+      "montant_alloue": "150000",
+      "montant_utilise": "50000",
+      "montant_restant": "100000",
+      "createdAt": "2026-07-01T14:30:00.000Z",
+      "budgetAnnuel": {
+        "reference": "BUDGET-2026-ABC",
+        "annee": 2026,
+        "date_debut": "2026-01-01T00:00:00.000Z",
+        "date_fin": "2026-12-31T00:00:00.000Z",
+        "budget": "500000",
+        "identifiant_entreprise": "ENT001",
+        "est_active": true,
+        "est_cloture": false
+      }
+    }
+  ]
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 401 | Token manquant ou invalide |
+| 403 | Accès refusé (id utilisateur manquant) |
+| 404 | Utilisateur non trouvé |
+
+---
+
+### GET `/api/budgets-allocation/employe/:matricule/budgets`
+
+Retourne tous les budgets personnels alloués à un employé ou consultant spécifique, avec les détails du budget annuel associé.
+
+**Accès**
+- `SUPERADMIN` : tout employé de toutes les entreprises
+- `MANAGER` : employés de sa propre entreprise uniquement
+- `EMPLOYE` / `CONSULTANT` : son propre matricule uniquement
+
+**Paramètre URL** : `matricule` de l'employé/consultant
+
+**Réponse 200**
+```json
+{
+  "total": 2,
+  "employe": {
+    "id": 5,
+    "prenom": "Jean",
+    "nom": "Dupont",
+    "matricule": "AB1234",
+    "role": "EMPLOYE"
+  },
+  "budgets": [
+    {
+      "id": 3,
+      "reference": "BUDGET-2026-ABC",
+      "matricule": "AB1234",
+      "montant_alloue": "150000",
+      "montant_utilise": "50000",
+      "montant_restant": "100000",
+      "createdAt": "2026-07-01T14:30:00.000Z",
+      "budgetAnnuel": {
+        "reference": "BUDGET-2026-ABC",
+        "annee": 2026,
+        "date_debut": "2026-01-01T00:00:00.000Z",
+        "date_fin": "2026-12-31T00:00:00.000Z",
+        "budget": "500000",
+        "identifiant_entreprise": "ENT001",
+        "est_active": true,
+        "est_cloture": false
+      }
+    }
+  ]
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé (MANAGER hors de son entreprise, ou EMPLOYE/CONSULTANT consultant un autre matricule) |
+| 404 | Employé non trouvé |
 
 ---
 

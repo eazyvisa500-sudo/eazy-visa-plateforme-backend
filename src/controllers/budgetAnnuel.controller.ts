@@ -2,6 +2,7 @@ import type { Request, Response } from 'express'
 import prisma from '../lib/prismaClient'
 import { generateReferenceBudget } from '../lib/generateCode'
 import { BadRequestError, NotFoundError, ForbiddenError, ConflictError } from '../utils/AppError'
+import { logAuditBudget } from '../utils/auditBudget'
 
 async function resolveEntrepriseIdentifiant(
   user: Express.Request['user'],
@@ -80,6 +81,20 @@ export const createBudgetAnnuel = async (req: Request, res: Response): Promise<v
       budget: budgetStr,
       montant_restant: budgetStr,
     },
+  })
+
+  const entreprise = await prisma.entreprise.findUnique({ where: { identifiant: targetIdentifiant } })
+  console.log('[DEBUG] createBudgetAnnuel entrepriseId=', entreprise?.id, 'reference=', budgetAnnuel.reference)
+  await logAuditBudget({
+    reference: budgetAnnuel.reference,
+    entrepriseId: entreprise?.id ?? 0,
+    action: 'CREER_BUDGET_ANNUEL',
+    type_destination: 'ANNUEL',
+    montant: Number(budgetStr),
+    description: `Budget annuel créé pour l'année ${annee}`,
+    effectue_par: user?.email || 'Inconnu',
+    effectue_par_id: user?.id ?? undefined,
+    role_effectue_par: user?.role,
   })
 
   res.status(201).json({ message: 'Budget annuel créé avec succès', budgetAnnuel })
@@ -164,6 +179,18 @@ export const updateBudgetAnnuel = async (req: Request, res: Response): Promise<v
     },
   })
 
+  const entreprise = await prisma.entreprise.findUnique({ where: { identifiant: existing.identifiant_entreprise } })
+  await logAuditBudget({
+    reference: existing.reference,
+    entrepriseId: entreprise?.id ?? 0,
+    action: 'MODIFIER_BUDGET_ANNUEL',
+    type_destination: 'ANNUEL',
+    description: `Budget annuel ${existing.reference} mis à jour`,
+    effectue_par: user?.email || 'Inconnu',
+    effectue_par_id: user?.id ?? undefined,
+    role_effectue_par: user?.role,
+  })
+
   res.status(200).json({ message: 'Budget annuel mis à jour', budgetAnnuel: updated })
 }
 
@@ -187,6 +214,18 @@ export const deleteBudgetAnnuel = async (req: Request, res: Response): Promise<v
       'BUDGET_HAS_CHILDREN'
     )
   }
+
+  const entreprise = await prisma.entreprise.findUnique({ where: { identifiant: existing.identifiant_entreprise } })
+  await logAuditBudget({
+    reference: existing.reference,
+    entrepriseId: entreprise?.id ?? 0,
+    action: 'SUPPRIMER_BUDGET_ANNUEL',
+    type_destination: 'ANNUEL',
+    description: `Budget annuel ${existing.reference} supprimé`,
+    effectue_par: user?.email || 'Inconnu',
+    effectue_par_id: user?.id ?? undefined,
+    role_effectue_par: user?.role,
+  })
 
   await prisma.budgetAnnuel.delete({ where: { id } })
   res.status(200).json({ message: 'Budget annuel supprimé avec succès' })
@@ -216,6 +255,18 @@ export const activerBudgetAnnuel = async (req: Request, res: Response): Promise<
     data: { est_active: true },
   })
 
+  const entreprise = await prisma.entreprise.findUnique({ where: { identifiant: existing.identifiant_entreprise } })
+  await logAuditBudget({
+    reference: existing.reference,
+    entrepriseId: entreprise?.id ?? 0,
+    action: 'ACTIVER_BUDGET_ANNUEL',
+    type_destination: 'ANNUEL',
+    description: `Budget annuel ${existing.reference} activé`,
+    effectue_par: user?.email || 'Inconnu',
+    effectue_par_id: user?.id ?? undefined,
+    role_effectue_par: user?.role,
+  })
+
   res.status(200).json({ message: 'Budget annuel activé', budgetAnnuel: updated })
 }
 
@@ -243,5 +294,55 @@ export const cloturerBudgetAnnuel = async (req: Request, res: Response): Promise
     data: { est_cloture: true },
   })
 
+  const entreprise = await prisma.entreprise.findUnique({ where: { identifiant: existing.identifiant_entreprise } })
+  await logAuditBudget({
+    reference: existing.reference,
+    entrepriseId: entreprise?.id ?? 0,
+    action: 'CLOTURER_BUDGET_ANNUEL',
+    type_destination: 'ANNUEL',
+    description: `Budget annuel ${existing.reference} clôturé`,
+    effectue_par: user?.email || 'Inconnu',
+    effectue_par_id: user?.id ?? undefined,
+    role_effectue_par: user?.role,
+  })
+
   res.status(200).json({ message: 'Budget annuel clôturé', budgetAnnuel: updated })
+}
+
+export const getBudgetsAnnuelsByEntreprise = async (req: Request, res: Response): Promise<void> => {
+  const user = req.user
+  const identifiant = String(req.params['identifiant'])
+
+  const entreprise = await prisma.entreprise.findUnique({
+    where: { identifiant },
+  })
+  if (!entreprise) {
+    throw new NotFoundError('Entreprise')
+  }
+
+  if (user?.role === 'MANAGER' && user.entrepriseId) {
+    const managerEntreprise = await prisma.entreprise.findUnique({
+      where: { id: user.entrepriseId },
+    })
+    if (!managerEntreprise || managerEntreprise.identifiant !== identifiant) {
+      throw new ForbiddenError()
+    }
+  }
+
+  const budgets = await prisma.budgetAnnuel.findMany({
+    where: { identifiant_entreprise: identifiant },
+    include: {
+      entreprise: { select: { id: true, nom: true, identifiant: true } },
+      budgetDepartements: {
+        include: { departement: { select: { id: true, nom: true } } },
+      },
+      budgetPersonnels: {
+        include: { user: { select: { id: true, prenom: true, nom: true, matricule: true } } },
+      },
+      _count: { select: { budgetDepartements: true, budgetPersonnels: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  res.status(200).json({ total: budgets.length, budgets })
 }
