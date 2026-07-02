@@ -354,6 +354,9 @@ export const updateBudgetDepartement = async (req: Request, res: Response): Prom
   if (budgetAnnuel.est_cloture) {
     throw new ConflictError('Impossible de modifier sur un budget clôturé', 'BUDGET_CLOTURE')
   }
+  if (existing.bloquer) {
+    throw new ConflictError('Ce budget département est bloqué', 'BUDGET_BLOQUE')
+  }
 
   const ancienMontant = Number(existing.montant_alloue)
   const difference = nouveauMontant - ancienMontant
@@ -426,6 +429,9 @@ export const deleteBudgetDepartement = async (req: Request, res: Response): Prom
   if (budgetAnnuel.est_cloture) {
     throw new ConflictError('Impossible de supprimer sur un budget clôturé', 'BUDGET_CLOTURE')
   }
+  if (existing.bloquer) {
+    throw new ConflictError('Ce budget département est bloqué', 'BUDGET_BLOQUE')
+  }
 
   const personnels = await prisma.budgetPersonnel.count({ where: { reference: existing.reference } })
   if (personnels > 0) {
@@ -493,6 +499,9 @@ export const updateBudgetPersonnel = async (req: Request, res: Response): Promis
 
   if (budgetAnnuel.est_cloture) {
     throw new ConflictError('Impossible de modifier sur un budget clôturé', 'BUDGET_CLOTURE')
+  }
+  if (existing.bloquer) {
+    throw new ConflictError('Ce budget personnel est bloqué', 'BUDGET_BLOQUE')
   }
 
   const ancienMontant = Number(existing.montant_alloue)
@@ -600,6 +609,9 @@ export const deleteBudgetPersonnel = async (req: Request, res: Response): Promis
 
   if (budgetAnnuel.est_cloture) {
     throw new ConflictError('Impossible de supprimer sur un budget clôturé', 'BUDGET_CLOTURE')
+  }
+  if (existing.bloquer) {
+    throw new ConflictError('Ce budget personnel est bloqué', 'BUDGET_BLOQUE')
   }
 
   const restantADegager = Number(existing.montant_restant)
@@ -800,6 +812,9 @@ export const augmenterBudgetDepartement = async (req: Request, res: Response): P
   if (budgetAnnuel.est_cloture) {
     throw new ConflictError('Impossible de modifier un budget clôturé', 'BUDGET_CLOTURE')
   }
+  if (existing.bloquer) {
+    throw new ConflictError('Ce budget département est bloqué', 'BUDGET_BLOQUE')
+  }
 
   const restantAnnuel = Number(budgetAnnuel.montant_restant)
   if (val > restantAnnuel) {
@@ -872,6 +887,9 @@ export const diminuerBudgetDepartement = async (req: Request, res: Response): Pr
 
   if (budgetAnnuel.est_cloture) {
     throw new ConflictError('Impossible de modifier un budget clôturé', 'BUDGET_CLOTURE')
+  }
+  if (existing.bloquer) {
+    throw new ConflictError('Ce budget département est bloqué', 'BUDGET_BLOQUE')
   }
 
   if (val > Number(existing.montant_restant)) {
@@ -946,6 +964,9 @@ export const augmenterBudgetPersonnel = async (req: Request, res: Response): Pro
 
   if (budgetAnnuel.est_cloture) {
     throw new ConflictError('Impossible de modifier un budget clôturé', 'BUDGET_CLOTURE')
+  }
+  if (existing.bloquer) {
+    throw new ConflictError('Ce budget personnel est bloqué', 'BUDGET_BLOQUE')
   }
 
   const targetUser = await prisma.user.findUnique({ where: { matricule: existing.matricule } })
@@ -1077,6 +1098,9 @@ export const diminuerBudgetPersonnel = async (req: Request, res: Response): Prom
 
   if (budgetAnnuel.est_cloture) {
     throw new ConflictError('Impossible de modifier un budget clôturé', 'BUDGET_CLOTURE')
+  }
+  if (existing.bloquer) {
+    throw new ConflictError('Ce budget personnel est bloqué', 'BUDGET_BLOQUE')
   }
 
   if (val > Number(existing.montant_restant)) {
@@ -1359,4 +1383,164 @@ export const getBudgetsPersonnelsByEmploye = async (req: Request, res: Response)
     },
     budgets,
   })
+}
+
+export const bloquerBudgetDepartement = async (req: Request, res: Response): Promise<void> => {
+  const user = req.user
+  const id = parseInt(String(req.params['id'] ?? '0'))
+
+  const existing = await prisma.budgetDepartement.findUnique({ where: { id } })
+  if (!existing) {
+    throw new NotFoundError('Budget département')
+  }
+
+  const budgetAnnuel = await prisma.budgetAnnuel.findUnique({ where: { reference: existing.reference } })
+  if (!budgetAnnuel) {
+    throw new NotFoundError('Budget annuel')
+  }
+
+  await checkBudgetOwnership(user, budgetAnnuel.identifiant_entreprise)
+
+  if (existing.bloquer) {
+    throw new ConflictError('Ce budget département est déjà bloqué', 'BUDGET_DEJA_BLOQUE')
+  }
+
+  const updated = await prisma.budgetDepartement.update({
+    where: { id },
+    data: { bloquer: true },
+  })
+
+  await logAuditBudget({
+    reference: existing.reference,
+    entrepriseId: (await prisma.entreprise.findUnique({ where: { identifiant: budgetAnnuel.identifiant_entreprise } }))?.id ?? 0,
+    action: 'BLOQUER_BUDGET_DEPARTEMENT',
+    type_destination: 'DEPARTEMENT',
+    description: `Budget département ${id} bloqué`,
+    effectue_par: user?.email || 'Inconnu',
+    effectue_par_id: user?.id ?? undefined,
+    role_effectue_par: user?.role,
+    target_id: existing.departementId,
+  })
+
+  res.status(200).json({ message: 'Budget département bloqué', budgetDepartement: updated })
+}
+
+export const debloquerBudgetDepartement = async (req: Request, res: Response): Promise<void> => {
+  const user = req.user
+  const id = parseInt(String(req.params['id'] ?? '0'))
+
+  const existing = await prisma.budgetDepartement.findUnique({ where: { id } })
+  if (!existing) {
+    throw new NotFoundError('Budget département')
+  }
+
+  const budgetAnnuel = await prisma.budgetAnnuel.findUnique({ where: { reference: existing.reference } })
+  if (!budgetAnnuel) {
+    throw new NotFoundError('Budget annuel')
+  }
+
+  await checkBudgetOwnership(user, budgetAnnuel.identifiant_entreprise)
+
+  if (!existing.bloquer) {
+    throw new ConflictError('Ce budget département n\'est pas bloqué', 'BUDGET_PAS_BLOQUE')
+  }
+
+  const updated = await prisma.budgetDepartement.update({
+    where: { id },
+    data: { bloquer: false },
+  })
+
+  await logAuditBudget({
+    reference: existing.reference,
+    entrepriseId: (await prisma.entreprise.findUnique({ where: { identifiant: budgetAnnuel.identifiant_entreprise } }))?.id ?? 0,
+    action: 'DEBLOQUER_BUDGET_DEPARTEMENT',
+    type_destination: 'DEPARTEMENT',
+    description: `Budget département ${id} débloqué`,
+    effectue_par: user?.email || 'Inconnu',
+    effectue_par_id: user?.id ?? undefined,
+    role_effectue_par: user?.role,
+    target_id: existing.departementId,
+  })
+
+  res.status(200).json({ message: 'Budget département débloqué', budgetDepartement: updated })
+}
+
+export const bloquerBudgetPersonnel = async (req: Request, res: Response): Promise<void> => {
+  const user = req.user
+  const id = parseInt(String(req.params['id'] ?? '0'))
+
+  const existing = await prisma.budgetPersonnel.findUnique({ where: { id } })
+  if (!existing) {
+    throw new NotFoundError('Budget personnel')
+  }
+
+  const budgetAnnuel = await prisma.budgetAnnuel.findUnique({ where: { reference: existing.reference } })
+  if (!budgetAnnuel) {
+    throw new NotFoundError('Budget annuel')
+  }
+
+  await checkBudgetOwnership(user, budgetAnnuel.identifiant_entreprise)
+
+  if (existing.bloquer) {
+    throw new ConflictError('Ce budget personnel est déjà bloqué', 'BUDGET_DEJA_BLOQUE')
+  }
+
+  const updated = await prisma.budgetPersonnel.update({
+    where: { id },
+    data: { bloquer: true },
+  })
+
+  await logAuditBudget({
+    reference: existing.reference,
+    entrepriseId: (await prisma.entreprise.findUnique({ where: { identifiant: budgetAnnuel.identifiant_entreprise } }))?.id ?? 0,
+    action: 'BLOQUER_BUDGET_PERSONNEL',
+    type_destination: 'PERSONNEL',
+    description: `Budget personnel ${id} bloqué`,
+    effectue_par: user?.email || 'Inconnu',
+    effectue_par_id: user?.id ?? undefined,
+    role_effectue_par: user?.role,
+    target_matricule: existing.matricule,
+  })
+
+  res.status(200).json({ message: 'Budget personnel bloqué', budgetPersonnel: updated })
+}
+
+export const debloquerBudgetPersonnel = async (req: Request, res: Response): Promise<void> => {
+  const user = req.user
+  const id = parseInt(String(req.params['id'] ?? '0'))
+
+  const existing = await prisma.budgetPersonnel.findUnique({ where: { id } })
+  if (!existing) {
+    throw new NotFoundError('Budget personnel')
+  }
+
+  const budgetAnnuel = await prisma.budgetAnnuel.findUnique({ where: { reference: existing.reference } })
+  if (!budgetAnnuel) {
+    throw new NotFoundError('Budget annuel')
+  }
+
+  await checkBudgetOwnership(user, budgetAnnuel.identifiant_entreprise)
+
+  if (!existing.bloquer) {
+    throw new ConflictError('Ce budget personnel n\'est pas bloqué', 'BUDGET_PAS_BLOQUE')
+  }
+
+  const updated = await prisma.budgetPersonnel.update({
+    where: { id },
+    data: { bloquer: false },
+  })
+
+  await logAuditBudget({
+    reference: existing.reference,
+    entrepriseId: (await prisma.entreprise.findUnique({ where: { identifiant: budgetAnnuel.identifiant_entreprise } }))?.id ?? 0,
+    action: 'DEBLOQUER_BUDGET_PERSONNEL',
+    type_destination: 'PERSONNEL',
+    description: `Budget personnel ${id} débloqué`,
+    effectue_par: user?.email || 'Inconnu',
+    effectue_par_id: user?.id ?? undefined,
+    role_effectue_par: user?.role,
+    target_matricule: existing.matricule,
+  })
+
+  res.status(200).json({ message: 'Budget personnel débloqué', budgetPersonnel: updated })
 }

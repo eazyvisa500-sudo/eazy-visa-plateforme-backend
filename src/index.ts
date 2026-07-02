@@ -7,6 +7,7 @@ import employeRoutes from './routes/employe.routes'
 import departementRoutes from './routes/departement.routes'
 import budgetAnnuelRoutes from './routes/budgetAnnuel.routes'
 import budgetAllocationRoutes from './routes/budgetAllocation.routes'
+import politiqueRoutes from './routes/politique.routes'
 import { errorHandler } from './middlewares/error.middleware'
 import { requestLogger } from './middlewares/logger.middleware'
 
@@ -24,6 +25,7 @@ app.use('/api/departements', departementRoutes)
 app.use('/api/budgets-annuels', budgetAllocationRoutes)
 app.use('/api/budgets-allocation', budgetAllocationRoutes)
 app.use('/api/budgets-annuels', budgetAnnuelRoutes)
+app.use('/api/politiques', politiqueRoutes)
 
 app.use(errorHandler)
 

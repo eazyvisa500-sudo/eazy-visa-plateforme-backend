@@ -6,6 +6,7 @@ export interface AuthPayload {
   email: string
   role: string
   entrepriseId?: number
+  matricule?: string
 }
 
 declare global {

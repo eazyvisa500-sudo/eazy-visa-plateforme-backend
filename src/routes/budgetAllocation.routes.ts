@@ -18,6 +18,10 @@ import {
   getAuditsByEmploye,
   getMesBudgetsPersonnels,
   getBudgetsPersonnelsByEmploye,
+  bloquerBudgetDepartement,
+  debloquerBudgetDepartement,
+  bloquerBudgetPersonnel,
+  debloquerBudgetPersonnel,
 } from '../controllers/budgetAllocation.controller'
 import { requireAuth, requireManagerOrSuperAdmin } from '../middlewares/auth.middleware'
 import { asyncHandler } from '../utils/asyncHandler'
@@ -58,5 +62,13 @@ router.post('/departements/:id/diminuer', asyncHandler(diminuerBudgetDepartement
 // Augmenter / Diminuer budget personnel
 router.post('/personnels/:id/augmenter', asyncHandler(augmenterBudgetPersonnel))
 router.post('/personnels/:id/diminuer', asyncHandler(diminuerBudgetPersonnel))
+
+// Bloquer / Débloquer budget département
+router.patch('/departements/:id/bloquer', asyncHandler(bloquerBudgetDepartement))
+router.patch('/departements/:id/debloquer', asyncHandler(debloquerBudgetDepartement))
+
+// Bloquer / Débloquer budget personnel
+router.patch('/personnels/:id/bloquer', asyncHandler(bloquerBudgetPersonnel))
+router.patch('/personnels/:id/debloquer', asyncHandler(debloquerBudgetPersonnel))
 
 export default router

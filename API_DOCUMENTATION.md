@@ -1223,6 +1223,98 @@ Diminuer le montant alloué d'un budget personnel.
 
 ---
 
+### PATCH `/api/budgets-annuels/departements/:id/bloquer`
+
+Bloquer un budget département. Empêche toute modification ultérieure du montant (augmenter, diminuer, modifier, supprimer).
+
+**Paramètre URL** : `id` (entier)
+
+**Réponse 200**
+```json
+{
+  "message": "Budget département bloqué",
+  "budgetDepartement": { "id": 2, "bloquer": true, ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Budget département non trouvé |
+| 409 | Ce budget département est déjà bloqué |
+
+---
+
+### PATCH `/api/budgets-annuels/departements/:id/debloquer`
+
+Débloquer un budget département. Permet à nouveau les modifications de montant.
+
+**Paramètre URL** : `id` (entier)
+
+**Réponse 200**
+```json
+{
+  "message": "Budget département débloqué",
+  "budgetDepartement": { "id": 2, "bloquer": false, ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Budget département non trouvé |
+| 409 | Ce budget département n'est pas bloqué |
+
+---
+
+### PATCH `/api/budgets-annuels/personnels/:id/bloquer`
+
+Bloquer un budget personnel. Empêche toute modification ultérieure du montant (augmenter, diminuer, modifier, supprimer).
+
+**Paramètre URL** : `id` (entier)
+
+**Réponse 200**
+```json
+{
+  "message": "Budget personnel bloqué",
+  "budgetPersonnel": { "id": 3, "bloquer": true, ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Budget personnel non trouvé |
+| 409 | Ce budget personnel est déjà bloqué |
+
+---
+
+### PATCH `/api/budgets-annuels/personnels/:id/debloquer`
+
+Débloquer un budget personnel. Permet à nouveau les modifications de montant.
+
+**Paramètre URL** : `id` (entier)
+
+**Réponse 200**
+```json
+{
+  "message": "Budget personnel débloqué",
+  "budgetPersonnel": { "id": 3, "bloquer": false, ... }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Budget personnel non trouvé |
+| 409 | Ce budget personnel n'est pas bloqué |
+
+---
+
 ### GET `/api/budgets-annuels/audits`
 
 Consulter l'historique des actions sur les budgets (traçabilité).
@@ -1445,7 +1537,212 @@ Retourne tous les budgets personnels alloués à un employé ou consultant spéc
 
 ---
 
-## 5. Employés
+## 5. Politiques de voyage
+
+Définit les conditions de voyage pour chaque employé (classes aériennes autorisées, nombre d'étoiles hôtel max).
+
+**Accès**
+- `SUPERADMIN` : toutes les politiques
+- `MANAGER` : politiques des employés de son entreprise uniquement
+- `EMPLOYE` / `CONSULTANT` : sa propre politique uniquement
+
+### POST `/api/politiques`
+
+Créer une politique de voyage pour un employé.
+
+**Headers**
+```
+Authorization: Bearer <token>
+```
+
+**Body**
+```json
+{
+  "matricule": "AB1234",
+  "y": true,
+  "w": false,
+  "j": false,
+  "f": false,
+  "hotel": 3
+}
+```
+
+- **y** : classe Économique (défaut: `false`)
+- **w** : Économie Premium (défaut: `false`)
+- **j** : Affaires / Business (défaut: `false`)
+- **f** : Première classe (défaut: `false`)
+- **hotel** : nombre d'étoiles max autorisé (défaut: `0`)
+
+**Réponse 201**
+```json
+{
+  "message": "Politique créée",
+  "politique": {
+    "id": 1,
+    "matricule": "AB1234",
+    "y": true,
+    "w": false,
+    "j": false,
+    "f": false,
+    "hotel": 3,
+    "createdAt": "2026-07-02T10:00:00.000Z",
+    "updatedAt": "2026-07-02T10:00:00.000Z"
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | matricule est requis |
+| 403 | Accès non autorisé |
+| 404 | Employé non trouvé |
+| 409 | Une politique existe déjà pour cet employé |
+
+---
+
+### GET `/api/politiques`
+
+Lister toutes les politiques de voyage (manager/superadmin uniquement).
+
+**Headers**
+```
+Authorization: Bearer <token>
+```
+
+**Réponse 200**
+```json
+{
+  "total": 2,
+  "politiques": [
+    {
+      "id": 1,
+      "matricule": "AB1234",
+      "y": true,
+      "w": false,
+      "j": false,
+      "f": false,
+      "hotel": 3,
+      "user": {
+        "id": 5,
+        "prenom": "Jean",
+        "nom": "Dupont",
+        "matricule": "AB1234",
+        "role": "EMPLOYE",
+        "entrepriseId": 1
+      }
+    }
+  ]
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+
+---
+
+### GET `/api/politiques/:matricule`
+
+Récupérer la politique de voyage d'un employé spécifique.
+
+**Paramètre URL** : `matricule`
+
+**Réponse 200**
+```json
+{
+  "politique": {
+    "id": 1,
+    "matricule": "AB1234",
+    "y": true,
+    "w": false,
+    "j": false,
+    "f": false,
+    "hotel": 3,
+    "user": {
+      "id": 5,
+      "prenom": "Jean",
+      "nom": "Dupont",
+      "matricule": "AB1234",
+      "role": "EMPLOYE"
+    }
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Politique non trouvée |
+
+---
+
+### PUT `/api/politiques/:matricule`
+
+Modifier la politique de voyage d'un employé.
+
+**Paramètre URL** : `matricule`
+
+**Body** (tous les champs sont optionnels)
+```json
+{
+  "y": true,
+  "w": true,
+  "j": false,
+  "f": false,
+  "hotel": 4
+}
+```
+
+**Réponse 200**
+```json
+{
+  "message": "Politique mise à jour",
+  "politique": {
+    "id": 1,
+    "matricule": "AB1234",
+    "y": true,
+    "w": true,
+    "j": false,
+    "f": false,
+    "hotel": 4,
+    "updatedAt": "2026-07-02T11:00:00.000Z"
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Politique non trouvée |
+
+---
+
+### DELETE `/api/politiques/:matricule`
+
+Supprimer la politique de voyage d'un employé.
+
+**Paramètre URL** : `matricule`
+
+**Réponse 200**
+```json
+{
+  "message": "Politique supprimée"
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 403 | Accès non autorisé |
+| 404 | Politique non trouvée |
+
+---
+
+## 6. Employés
 
 ### POST `/api/employes`
 
