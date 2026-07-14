@@ -4,35 +4,67 @@ import { generateIdentifiantEntreprise } from '../lib/generateCode'
 import { BadRequestError, NotFoundError } from '../utils/AppError'
 
 export const createEntreprise = async (req: Request, res: Response): Promise<void> => {
-  const { nom, adresse, pays, region, ville, logo } = req.body as {
+  const { nom, adresse, pays, region, ville, logo, nombre_user_autorise } = req.body as {
     nom: string
     adresse: string
     pays: string
     region: string
     ville: string
     logo?: string
+    nombre_user_autorise?: number
   }
 
   if (!nom || !adresse || !pays || !region || !ville) {
     throw new BadRequestError('Tous les champs sont requis : nom, adresse, pays, region, ville', 'MISSING_FIELDS')
   }
 
+  if (!nombre_user_autorise || nombre_user_autorise <= 0) {
+    throw new BadRequestError('nombre_user_autorise est requis et doit être supérieur à 0', 'INVALID_USERS_LIMIT')
+  }
+
   const identifiant = await generateIdentifiantEntreprise()
 
   const entreprise = await prisma.entreprise.create({
-    data: { nom, identifiant, adresse, pays, region, ville, logo },
+    data: {
+      nom,
+      identifiant,
+      adresse,
+      pays,
+      region,
+      ville,
+      ...(logo !== undefined && { logo }),
+    },
+  })
+
+  // Créer automatiquement le forfait pour l'entreprise
+  const forfait = await prisma.forfait.create({
+    data: {
+      entrepriseId: entreprise.id,
+      nombre_user_autorise,
+      nombre_user_actuel: 0,
+    },
   })
 
   res.status(201).json({
     message: 'Entreprise créée avec succès',
     identifiant_genere: entreprise.identifiant,
     entreprise,
+    forfait,
   })
 }
 
 export const getAllEntreprises = async (_req: Request, res: Response): Promise<void> => {
   const entreprises = await prisma.entreprise.findMany({
-    include: { _count: { select: { users: true } } },
+    include: {
+      _count: { select: { users: true } },
+      forfait: {
+        select: {
+          id: true,
+          nombre_user_autorise: true,
+          nombre_user_actuel: true,
+        },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   })
   res.status(200).json(entreprises)
@@ -51,6 +83,13 @@ export const getEntrepriseById = async (req: Request, res: Response): Promise<vo
           email: true,
           poste: true,
           role: true,
+        },
+      },
+      forfait: {
+        select: {
+          id: true,
+          nombre_user_autorise: true,
+          nombre_user_actuel: true,
         },
       },
     },

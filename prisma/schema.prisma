@@ -25,6 +25,8 @@ model Entreprise {
   users         User[]
   budgetsAnnuels BudgetAnnuel[]
   departements   Departement[]
+  demandesVoyage DemandeVoyage[]
+  forfait        Forfait?
 
   @@map("entreprises")
 }
@@ -36,11 +38,15 @@ model BudgetAnnuel {
   annee                  Int
   date_debut             DateTime
   date_fin               DateTime
+  budget                 Decimal
+  montant_restant        Decimal
   est_active             Boolean  @default(false)
   est_cloture            Boolean  @default(false)
   createdAt              DateTime @default(now())
 
-  entreprise Entreprise @relation(fields: [identifiant_entreprise], references: [identifiant])
+  entreprise       Entreprise        @relation(fields: [identifiant_entreprise], references: [identifiant])
+  budgetDepartements BudgetDepartement[]
+  budgetPersonnels   BudgetPersonnel[]
 
   @@map("budget_annuel")
 }
@@ -52,7 +58,10 @@ model Departement {
 
   entreprise Entreprise @relation(fields: [entrepriseId], references: [id])
   users      User[]
+  budgetDepartements BudgetDepartement[]
 
+  @@index([entrepriseId])
+  @@index([nom])
   @@map("departements")
 }
 
@@ -75,11 +84,248 @@ model User {
   mot_de_passe String
   role         Role       @default(EMPLOYE)
   is_block     Boolean    @default(false)
+  civilite     String?
+  genre        String?
+  numero_passport String?
+  date_expiration_passport DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  entreprise  Entreprise  @relation(fields: [entrepriseId], references: [id])
-  departement Departement @relation(fields: [departementId], references: [id])
+  entreprise      Entreprise       @relation(fields: [entrepriseId], references: [id])
+  departement     Departement      @relation(fields: [departementId], references: [id])
+  budgetPersonnels BudgetPersonnel[]
+  politique       Politique?
+  demandesVoyage  DemandeVoyage[]
 
+  @@index([entrepriseId])
+  @@index([departementId])
+  @@index([role])
+  @@index([is_block])
   @@map("users")
+}
+
+model BudgetDepartement {
+  id              Int      @id @default(autoincrement())
+  reference       String
+  departementId   Int
+  montant_alloue  Decimal
+  montant_utilise Decimal  @default(0)
+  montant_restant Decimal
+  bloquer         Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  budgetAnnuel BudgetAnnuel @relation(fields: [reference], references: [reference])
+  departement  Departement  @relation(fields: [departementId], references: [id])
+
+  @@index([reference])
+  @@index([departementId])
+  @@index([bloquer])
+  @@map("budget_departements")
+}
+
+model BudgetPersonnel {
+  id              Int      @id @default(autoincrement())
+  reference       String
+  matricule       String
+  montant_alloue  Decimal
+  montant_utilise Decimal  @default(0)
+  montant_restant Decimal
+  bloquer         Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  budgetAnnuel BudgetAnnuel @relation(fields: [reference], references: [reference])
+  user         User         @relation(fields: [matricule], references: [matricule])
+
+  @@index([reference])
+  @@index([matricule])
+  @@index([bloquer])
+  @@map("budget_personnels")
+}
+
+model AuditBudget {
+  id                 Int      @id @default(autoincrement())
+  reference          String
+  entrepriseId       Int
+  action             String
+  type_source        String?
+  type_destination   String?
+  montant            Decimal?
+  montant_avant      Decimal?
+  montant_apres      Decimal?
+  description        String?
+  effectue_par       String
+  effectue_par_id    Int?
+  role_effectue_par  String?  // SUPERADMIN, MANAGER, etc.
+  target_id          Int?     // id département cible si applicable
+  target_matricule   String?  // matricule personnel cible si applicable
+  createdAt          DateTime @default(now())
+
+  @@index([reference])
+  @@index([entrepriseId])
+  @@index([createdAt])
+  @@index([target_matricule])
+  @@map("audit_budgets")
+}
+
+model Politique {
+  id        Int      @id @default(autoincrement())
+  matricule String   @unique
+  y         Boolean  @default(false)  // économique
+  w         Boolean  @default(false)  // Économie Premium
+  j         Boolean  @default(false)  // Affaires / Business
+  f         Boolean  @default(false)  // Première classe
+  hotel     Int      @default(0)      // étoiles max autorisées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [matricule], references: [matricule])
+
+  @@map("politiques")
+}
+
+enum StatutDemande {
+  EN_ATTENTE
+  APPROUVEE
+  REJETEE
+  ANNULEE
+  EN_COURS
+  TERMINEE
+}
+
+enum StatutReservation {
+  EN_ATTENTE
+  CONFIRMEE
+  EMISE
+  ANNULEE
+  REMBOURSEE
+}
+
+enum StatutReservationHotel {
+  EN_ATTENTE
+  CONFIRMEE
+  ANNULEE
+  REMBOURSEE
+}
+
+enum StatutBillet {
+  EN_ATTENTE
+  DISPONIBLE
+}
+
+model DemandeVoyage {
+  id                     Int           @id @default(autoincrement())
+  matricule              String
+  identifiant_entreprise String
+  depart                 String
+  arrive                 String
+  allerRetour            Boolean       @default(false) // true = A/R, false = aller simple
+  dateDepart             DateTime
+  dateRetour             DateTime?
+  classe                 String        @default("Y") // Y=Economique, W=Premium, J=Affaires, F=Premiere
+  hotel                  String        @default("NON_INCLUS") // 1,2,3,4,5 ou NON_INCLUS
+  ville                  String?
+  pays                   String?
+  etat                   String?
+  region                 String?
+  motif                  String
+  statut                 StatutDemande @default(EN_ATTENTE)
+  commentaire            String?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  user       User       @relation(fields: [matricule], references: [matricule])
+  entreprise Entreprise @relation(fields: [identifiant_entreprise], references: [identifiant])
+  reservationBillet ReservationBillet?
+  reservationHotel  ReservationHotel?
+
+  @@index([matricule])
+  @@index([identifiant_entreprise])
+  @@index([statut])
+  @@index([dateDepart])
+  @@map("demande_voyages")
+}
+
+model ReservationBillet {
+  id                    Int           @id @default(autoincrement())
+  demandeVoyageId       Int           @unique
+  matricule             String?
+  allerRetour           Boolean       @default(false)
+  numeroReservation     String
+  numeroOrder           String?
+  compagnieAerienne     String?
+  numeroVolAller        String?
+  numeroVolRetour       String?
+  dateVolDepart         DateTime?
+  dateVolArrivee        DateTime?
+  dateVolRetourDepart   DateTime?
+  dateVolRetourArrivee  DateTime?
+  aeroportDepart        String?
+  aeroportArrivee       String?
+  classe                String        @default("Y")
+  prix                  Decimal?
+  devise                String        @default("XOF")
+  statut                StatutReservation @default(EN_ATTENTE)
+  numeroBillet          String?
+  dateEmission          DateTime?
+  commentaire           String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  demandeVoyage         DemandeVoyage @relation(fields: [demandeVoyageId], references: [id])
+
+  @@index([matricule])
+  @@index([statut])
+  @@index([numeroOrder])
+  @@map("reservation_billets")
+}
+
+model ReservationHotel {
+  id                    Int           @id @default(autoincrement())
+  demandeVoyageId       Int           @unique
+  nomHotel              String?
+  categorie             String?
+  adresse               String?
+  ville                 String?
+  pays                  String?
+  dateArrivee           DateTime?
+  dateDepart            DateTime?
+  nombreNuits           Int?
+  prixParNuit           Decimal?
+  prixTotal             Decimal?
+  devise                String        @default("XOF")
+  statut                StatutReservationHotel @default(EN_ATTENTE)
+  numeroConfirmation    String?       @unique
+  commentaire           String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  demandeVoyage         DemandeVoyage @relation(fields: [demandeVoyageId], references: [id])
+
+  @@index([statut])
+  @@map("reservation_hotels")
+}
+
+model Billet {
+  id         Int           @id @default(autoincrement())
+  numeroOrder String        @unique
+  url        String?
+  statut     StatutBillet  @default(EN_ATTENTE)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@map("billets")
+}
+
+model Forfait {
+  id                      Int      @id @default(autoincrement())
+  entrepriseId            Int      @unique
+  nombre_user_autorise    Int
+  nombre_user_actuel      Int      @default(0)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  entreprise              Entreprise @relation(fields: [entrepriseId], references: [id])
+
+  @@index([entrepriseId])
+  @@map("forfaits")
 }
