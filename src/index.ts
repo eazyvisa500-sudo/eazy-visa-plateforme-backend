@@ -13,18 +13,27 @@ import budgetAllocationRoutes from './routes/budgetAllocation.routes'
 import politiqueRoutes from './routes/politique.routes'
 import demandeVoyageRoutes from './routes/demandeVoyage.routes'
 import reservationRoutes from './routes/reservation.routes'
+<<<<<<< HEAD
 import referenceDataRoutes from './routes/referenceData.routes'
 import flightsRoutes from './routes/flights.routes'
 import dashboardRoutes from './routes/dashboard.routes'
 import forfaitRoutes from './routes/forfait.routes'
+=======
+>>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
 import { errorHandler } from './middlewares/error.middleware'
 import { requestLogger } from './middlewares/logger.middleware'
 
 const app = express()
 const PORT = process.env['PORT'] ?? 3000
 
+<<<<<<< HEAD
 // Security headers
 app.use(helmet())
+=======
+app.use(cors())
+app.use(express.json())
+app.use(requestLogger)
+>>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
 
 // Response compression
 app.use(compression())
@@ -70,10 +79,13 @@ app.use('/api/budgets-annuels', budgetAnnuelRoutes)
 app.use('/api/politiques', politiqueRoutes)
 app.use('/api/demandes-voyage', demandeVoyageRoutes)
 app.use('/api/reservations', reservationRoutes)
+<<<<<<< HEAD
 app.use('/api/reference-data', referenceDataRoutes)
 app.use('/api/flights', flightsRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/forfaits', forfaitRoutes)
+=======
+>>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
 
 app.use(errorHandler)
 

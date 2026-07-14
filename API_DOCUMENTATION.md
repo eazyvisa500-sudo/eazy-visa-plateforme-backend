@@ -2210,6 +2210,7 @@ Supprimer la politique de voyage d'un employé.
 
 ---
 
+<<<<<<< HEAD
 ## 6. Forfaits
 
 Gère les forfaits d'entreprises, définissant le nombre d'utilisateurs autorisés et le nombre actuel.
@@ -2545,6 +2546,9 @@ Supprimer un forfait.
 ---
 
 ## 7. Demandes de voyage
+=======
+## 6. Demandes de voyage
+>>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
 
 Gestion des demandes de voyage des employés avec validation des politiques de classe et workflow d'approbation.
 
@@ -2874,7 +2878,10 @@ Authorization: Bearer <token>
         "demandeVoyageId": 10,
         "allerRetour": true,
         "numeroReservation": "RES-1719876543210",
+<<<<<<< HEAD
         "numeroOrder": "ord_0000B7xJ48O26NuJhCgNSn",
+=======
+>>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
         "compagnieAerienne": null,
         "numeroVolAller": null,
         "numeroVolRetour": null,
@@ -2968,7 +2975,10 @@ Authorization: Bearer <token>
         "id": 1,
         "demandeVoyageId": 10,
         "numeroReservation": "RES-1719876543210",
+<<<<<<< HEAD
         "numeroOrder": "ord_0000B7xJ48O26NuJhCgNSn",
+=======
+>>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
         "statut": "EN_ATTENTE",
         "demandeVoyage": {
           "id": 10,
@@ -3026,7 +3036,10 @@ Authorization: Bearer <token>
     "demandeVoyageId": 10,
     "allerRetour": true,
     "numeroReservation": "RES-1719876543210",
+<<<<<<< HEAD
     "numeroOrder": "ord_0000B7xJ48O26NuJhCgNSn",
+=======
+>>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
     "compagnieAerienne": null,
     "numeroVolAller": null,
     "numeroVolRetour": null,
@@ -3186,6 +3199,7 @@ Authorization: Bearer <token>
 
 ---
 
+<<<<<<< HEAD
 ### POST `/api/reservations/filter`
 
 Filtrer les réservations de billets en attente par date de vol et/ou aéroports.
@@ -4202,6 +4216,9 @@ Récupérer les détails d'une commande Duffel par son ID.
 ---
 
 ## 10. Employés
+=======
+## 8. Employés
+>>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
 
 ### POST `/api/employes`
 

@@ -69,6 +69,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
   const identifiantEntreprise = entreprise?.identifiant ?? ''
 
   const token = jwt.sign(
+<<<<<<< HEAD
     {
       id: user.id,
       email: user.email,
@@ -81,6 +82,9 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       numero_passport: user.numero_passport,
       date_expiration_passport: user.date_expiration_passport,
     },
+=======
+    { id: user.id, email: user.email, role: user.role, entrepriseId: user.entrepriseId, matricule: user.matricule, identifiantEntreprise },
+>>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
     jwtSecret,
     { expiresIn: '24h' }
   )
