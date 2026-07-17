@@ -12,8 +12,9 @@ dist/
 
 # Environment variables
 .env
-.env.local
-.env.production
+.env.example
+.env.*
+.env.*
 
 # Logs
 logs/

@@ -2210,7 +2210,6 @@ Supprimer la politique de voyage d'un employé.
 
 ---
 
-<<<<<<< HEAD
 ## 6. Forfaits
 
 Gère les forfaits d'entreprises, définissant le nombre d'utilisateurs autorisés et le nombre actuel.
@@ -2546,9 +2545,6 @@ Supprimer un forfait.
 ---
 
 ## 7. Demandes de voyage
-=======
-## 6. Demandes de voyage
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
 
 Gestion des demandes de voyage des employés avec validation des politiques de classe et workflow d'approbation.
 
@@ -2878,10 +2874,7 @@ Authorization: Bearer <token>
         "demandeVoyageId": 10,
         "allerRetour": true,
         "numeroReservation": "RES-1719876543210",
-<<<<<<< HEAD
         "numeroOrder": "ord_0000B7xJ48O26NuJhCgNSn",
-=======
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
         "compagnieAerienne": null,
         "numeroVolAller": null,
         "numeroVolRetour": null,
@@ -2975,10 +2968,7 @@ Authorization: Bearer <token>
         "id": 1,
         "demandeVoyageId": 10,
         "numeroReservation": "RES-1719876543210",
-<<<<<<< HEAD
         "numeroOrder": "ord_0000B7xJ48O26NuJhCgNSn",
-=======
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
         "statut": "EN_ATTENTE",
         "demandeVoyage": {
           "id": 10,
@@ -3036,10 +3026,7 @@ Authorization: Bearer <token>
     "demandeVoyageId": 10,
     "allerRetour": true,
     "numeroReservation": "RES-1719876543210",
-<<<<<<< HEAD
     "numeroOrder": "ord_0000B7xJ48O26NuJhCgNSn",
-=======
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
     "compagnieAerienne": null,
     "numeroVolAller": null,
     "numeroVolRetour": null,
@@ -3199,7 +3186,6 @@ Authorization: Bearer <token>
 
 ---
 
-<<<<<<< HEAD
 ### POST `/api/reservations/filter`
 
 Filtrer les réservations de billets en attente par date de vol et/ou aéroports.
@@ -3362,6 +3348,53 @@ Authorization: Bearer <token>
 ---
 
 ## 8. Recherche de Vols
+
+### GET `/api/flights/suggestions`
+
+Rechercher des suggestions d'aéroports via l'API Duffel.
+
+**Accès** : MANAGER ou SUPERADMIN
+
+**Headers**
+```
+Authorization: Bearer <token>
+```
+
+**Query Parameters**
+| Paramètre | Type | Requis | Description |
+|---|---|---|---|
+| query | string | Oui | Requête de recherche (ex: "dakar") |
+
+**Réponse 200**
+```json
+{
+  "success": true,
+  "data": {
+    "data": [
+      {
+        "id": "arp_lhr_gb",
+        "iata_code": "LHR",
+        "name": "London Heathrow",
+        "type": "airport",
+        "city": {
+          "id": "cty_lhr_gb",
+          "iata_country_code": "GB",
+          "iata_city_code": "LON",
+          "name": "London"
+        }
+      }
+    ]
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | Le paramètre 'query' est requis. |
+| 500 | Erreur interne du serveur. |
+
+---
 
 ### POST `/api/reference-data/flights/search`
 
@@ -3672,6 +3705,75 @@ Réserver un vol pour plusieurs passagers via le SDK Duffel.
 | 404 | Certains utilisateurs n'ont pas de budget |
 | 404 | Certaines réservations de billet n'ont pas été trouvées |
 | 409 | Certaines réservations ne sont pas en attente |
+| 500 | Erreur lors de la réservation du vol groupé |
+
+---
+
+### POST `/api/flights/book-group-direct`
+
+Réserver un vol pour plusieurs passagers via le SDK Duffel **sans demande de voyage préexistante**. Cette API crée automatiquement les demandes de voyage et les réservations.
+
+**Accès** : Manager ou SuperAdmin
+
+**Body**
+```json
+{
+  "selected_offers": ["off_0000B7xJ48O26NuJhCgNSn"],
+  "matricules": ["A3T9KL", "B4X5MN", "C7Y8OP"],
+  "passenger_ids": ["passenger_1", "passenger_2", "passenger_3"]
+}
+```
+
+| Paramètre | Type | Requis | Description |
+|---|---|---|---|
+| selected_offers | array | Oui | Liste des IDs des offres à réserver |
+| matricules | array | Oui | Tableau des matricules des passagers |
+| passenger_ids | array | Oui | Tableau des IDs uniques des passagers pour la réservation Duffel |
+
+**Comportement**
+
+> **Note** : La réservation groupée directe effectue les opérations suivantes :
+> 1. Vérifie que les tableaux matricules et passenger_ids ont la même longueur
+> 2. Récupère les informations de tous les passagers depuis leurs profils utilisateurs (avec leur entreprise)
+> 3. Vérifie que tous les passagers ont des informations de passeport valides
+> 4. Rafraîchit l'offre Duffel pour obtenir le prix à jour
+> 5. Vérifie le budget de chaque utilisateur (budget non bloqué et montant suffisant)
+> 6. Convertit le prix en FCFA selon la devise (USD → 550 FCFA, EUR → 650 FCFA, XOF → 1)
+> 7. Crée la réservation groupée via l'API Duffel
+> 8. Crée automatiquement une demande de voyage pour chaque utilisateur (statut APPROUVEE)
+> 9. Crée automatiquement une réservation de billet pour chaque utilisateur (statut EMISE)
+> 10. Déduit le montant du budget personnel de chaque utilisateur
+> 11. Crée des entrées AuditBudget pour tracer chaque transaction
+
+**Réponse 200**
+```json
+{
+  "order": {
+    "id": "ord_0000B7xJ48O26NuJhCgNSn",
+    "booking_reference": "ABC123",
+    "total_amount": "5017.27",
+    "currency": "EUR",
+    "slices": [...],
+    "passengers": [...],
+    "documents": [...]
+  },
+  "passengers": ["A3T9KL", "B4X5MN", "C7Y8OP"],
+  "totalPassengers": 3
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | selected_offers est requis |
+| 400 | matricules est requis (tableau non vide) |
+| 400 | passenger_ids est requis (tableau non vide) |
+| 400 | Les tableaux matricules et passenger_ids doivent avoir la même longueur |
+| 400 | Certains utilisateurs n'ont pas de passeport valide |
+| 400 | Certains utilisateurs ont un budget insuffisant |
+| 403 | Certains budgets sont bloqués |
+| 404 | Certains utilisateurs n'ont pas été trouvés |
+| 404 | Certains utilisateurs n'ont pas de budget |
 | 500 | Erreur lors de la réservation du vol groupé |
 
 ---
@@ -4216,9 +4318,6 @@ Récupérer les détails d'une commande Duffel par son ID.
 ---
 
 ## 10. Employés
-=======
-## 8. Employés
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
 
 ### POST `/api/employes`
 

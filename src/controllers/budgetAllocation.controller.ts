@@ -1,8 +1,5 @@
 import type { Request, Response } from 'express'
-<<<<<<< HEAD
 import type { PrismaPromise } from '@prisma/client'
-=======
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
 import prisma from '../lib/prismaClient'
 import { BadRequestError, NotFoundError, ForbiddenError, ConflictError } from '../utils/AppError'
 import { logAuditBudget } from '../utils/auditBudget'
@@ -12,7 +9,6 @@ async function checkBudgetOwnership(
   identifiant_entreprise: string
 ): Promise<void> {
   if (user?.role === 'MANAGER') {
-<<<<<<< HEAD
     if (!user.entrepriseId) {
       throw new ForbiddenError()
     }
@@ -20,9 +16,6 @@ async function checkBudgetOwnership(
       where: { id: user.entrepriseId },
       select: { identifiant: true },
     })
-=======
-    const entreprise = await prisma.entreprise.findUnique({ where: { id: user.entrepriseId } })
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
     if (!entreprise || entreprise.identifiant !== identifiant_entreprise) {
       throw new ForbiddenError()
     }
@@ -555,11 +548,7 @@ export const updateBudgetPersonnel = async (req: Request, res: Response): Promis
     )
   }
 
-<<<<<<< HEAD
   const operations: any[] = [
-=======
-  const operations: Promise<unknown>[] = [
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
     prisma.budgetPersonnel.update({
       where: { id },
       data: {
@@ -641,11 +630,7 @@ export const deleteBudgetPersonnel = async (req: Request, res: Response): Promis
       })
     : null
 
-<<<<<<< HEAD
   const operations: PrismaPromise<any>[] = [
-=======
-  const operations: Promise<unknown>[] = [
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
     prisma.budgetPersonnel.delete({ where: { id } }),
   ]
 
@@ -1142,7 +1127,7 @@ export const diminuerBudgetPersonnel = async (req: Request, res: Response): Prom
   const nouveauAlloue = Number(existing.montant_alloue) - val
   const nouveauRestant = Number(existing.montant_restant) - val
 
-  const operations: Promise<unknown>[] = [
+  const operations: PrismaPromise<any>[] = [
     prisma.budgetPersonnel.update({
       where: { id },
       data: {

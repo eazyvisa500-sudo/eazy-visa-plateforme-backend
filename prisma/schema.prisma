@@ -26,10 +26,7 @@ model Entreprise {
   budgetsAnnuels BudgetAnnuel[]
   departements   Departement[]
   demandesVoyage DemandeVoyage[]
-<<<<<<< HEAD
   forfait        Forfait?
-=======
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
 
   @@map("entreprises")
 }
@@ -79,6 +76,7 @@ model User {
   entrepriseId Int
   prenom       String
   nom          String
+  date_naissance DateTime?
   email        String     @unique
   matricule    String   @unique
   departementId Int
@@ -89,6 +87,7 @@ model User {
   is_block     Boolean    @default(false)
   civilite     String?
   genre        String?
+  code_pays    String?
   numero_passport String?
   date_expiration_passport DateTime?
   createdAt    DateTime   @default(now())
@@ -120,12 +119,9 @@ model BudgetDepartement {
   budgetAnnuel BudgetAnnuel @relation(fields: [reference], references: [reference])
   departement  Departement  @relation(fields: [departementId], references: [id])
 
-<<<<<<< HEAD
   @@index([reference])
   @@index([departementId])
   @@index([bloquer])
-=======
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
   @@map("budget_departements")
 }
 
@@ -142,12 +138,9 @@ model BudgetPersonnel {
   budgetAnnuel BudgetAnnuel @relation(fields: [reference], references: [reference])
   user         User         @relation(fields: [matricule], references: [matricule])
 
-<<<<<<< HEAD
   @@index([reference])
   @@index([matricule])
   @@index([bloquer])
-=======
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
   @@map("budget_personnels")
 }
 
@@ -169,13 +162,10 @@ model AuditBudget {
   target_matricule   String?  // matricule personnel cible si applicable
   createdAt          DateTime @default(now())
 
-<<<<<<< HEAD
   @@index([reference])
   @@index([entrepriseId])
   @@index([createdAt])
   @@index([target_matricule])
-=======
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
   @@map("audit_budgets")
 }
 
@@ -219,14 +209,11 @@ enum StatutReservationHotel {
   REMBOURSEE
 }
 
-<<<<<<< HEAD
 enum StatutBillet {
   EN_ATTENTE
   DISPONIBLE
 }
 
-=======
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
 model DemandeVoyage {
   id                     Int           @id @default(autoincrement())
   matricule              String
@@ -253,28 +240,20 @@ model DemandeVoyage {
   reservationBillet ReservationBillet?
   reservationHotel  ReservationHotel?
 
-<<<<<<< HEAD
   @@index([matricule])
   @@index([identifiant_entreprise])
   @@index([statut])
   @@index([dateDepart])
-=======
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
   @@map("demande_voyages")
 }
 
 model ReservationBillet {
   id                    Int           @id @default(autoincrement())
   demandeVoyageId       Int           @unique
-<<<<<<< HEAD
   matricule             String?
   allerRetour           Boolean       @default(false)
   numeroReservation     String
   numeroOrder           String?
-=======
-  allerRetour           Boolean       @default(false)
-  numeroReservation     String        @unique
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
   compagnieAerienne     String?
   numeroVolAller        String?
   numeroVolRetour       String?
@@ -288,11 +267,7 @@ model ReservationBillet {
   prix                  Decimal?
   devise                String        @default("XOF")
   statut                StatutReservation @default(EN_ATTENTE)
-<<<<<<< HEAD
   numeroBillet          String?
-=======
-  numeroBillet          String?       @unique
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
   dateEmission          DateTime?
   commentaire           String?
   createdAt             DateTime      @default(now())
@@ -300,12 +275,9 @@ model ReservationBillet {
 
   demandeVoyage         DemandeVoyage @relation(fields: [demandeVoyageId], references: [id])
 
-<<<<<<< HEAD
   @@index([matricule])
   @@index([statut])
   @@index([numeroOrder])
-=======
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
   @@map("reservation_billets")
 }
 
@@ -331,7 +303,6 @@ model ReservationHotel {
 
   demandeVoyage         DemandeVoyage @relation(fields: [demandeVoyageId], references: [id])
 
-<<<<<<< HEAD
   @@index([statut])
   @@map("reservation_hotels")
 }
@@ -359,7 +330,4 @@ model Forfait {
 
   @@index([entrepriseId])
   @@map("forfaits")
-=======
-  @@map("reservation_hotels")
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
 }

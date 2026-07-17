@@ -166,7 +166,6 @@ export const getReservationHotelById = async (req: Request, res: Response): Prom
 
   res.status(200).json({ reservation })
 }
-<<<<<<< HEAD
 
 export const filterReservations = async (req: Request, res: Response): Promise<void> => {
   const user = req.user
@@ -370,5 +369,3 @@ export const checkBudgets = async (req: Request, res: Response): Promise<void> =
     })
   }
 }
-=======
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8

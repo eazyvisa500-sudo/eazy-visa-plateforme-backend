@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { asyncHandler } from '../utils/asyncHandler'
-import { searchFlights, bookFlight, bookGroupFlight, getOrder, cancelOrder, confirmOrderCancellation, searchFlightsAdvanced } from '../controllers/flights.controller'
+import { searchFlights, bookFlight, bookGroupFlight, bookGroupFlightDirect, getOrder, cancelOrder, confirmOrderCancellation, searchFlightsAdvanced,searchAirportSuggestion } from '../controllers/flights.controller'
 import { requireAuth, requireManagerOrSuperAdmin } from '../middlewares/auth.middleware'
 
 const router = Router()
@@ -17,6 +17,9 @@ router.post('/book', requireAuth, requireManagerOrSuperAdmin, asyncHandler(bookF
 // Réservation de vol groupé via SDK Duffel (accès MANAGER/SUPERADMIN)
 router.post('/book-group', requireAuth, requireManagerOrSuperAdmin, asyncHandler(bookGroupFlight))
 
+// Réservation de vol groupé directe via SDK Duffel (accès MANAGER/SUPERADMIN)
+router.post('/book-group-direct', requireAuth, requireManagerOrSuperAdmin, asyncHandler(bookGroupFlightDirect))
+
 // Vérification des conditions d'annulation d'une commande Duffel (accès MANAGER/SUPERADMIN)
 router.post('/cancel/check', requireAuth, requireManagerOrSuperAdmin, asyncHandler(cancelOrder))
 
@@ -25,5 +28,7 @@ router.post('/cancel/confirm', requireAuth, requireManagerOrSuperAdmin, asyncHan
 
 // Récupération d'une commande Duffel par ID (accès MANAGER/SUPERADMIN)
 router.get('/orders/:id', requireAuth, requireManagerOrSuperAdmin, asyncHandler(getOrder))
+// suggestion d'aéroport
+router.get('/suggestions', requireAuth, asyncHandler(searchAirportSuggestion))
 
 export default router

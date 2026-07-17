@@ -4,27 +4,58 @@ import bcrypt from 'bcryptjs'
 import prisma from '../lib/prismaClient'
 import { BadRequestError, UnauthorizedError, ForbiddenError, AppError } from '../utils/AppError'
 
-export const loginSuperAdmin = async (req: Request, res: Response): Promise<void> => {
-  const { email, mot_de_passe } = req.body as { email: string; mot_de_passe: string }
+// Fixed dummy hash used to keep response times constant when no user matches,
+// mitigating user-enumeration timing attacks.
+const DUMMY_HASH = bcrypt.hashSync('dummy-password-not-used', 10)
 
-  const adminEmail = process.env['email_admin']
-  const adminPassword = process.env['Mot_de_passe_admin']
-  const jwtSecret = process.env['JWT_SECRET']
+interface LoginBody {
+  email: string
+  mot_de_passe: string
+}
 
-  if (!adminEmail || !adminPassword || !jwtSecret) {
-    throw new AppError('Configuration serveur manquante', 500, 'CONFIG_MISSING')
+function sanitizeLoginBody(body: unknown): LoginBody {
+  if (!body || typeof body !== 'object') {
+    throw new BadRequestError('Corps de requête invalide', 'INVALID_BODY')
   }
 
-  if (!email || !mot_de_passe) {
+  const { email, mot_de_passe } = body as Record<string, unknown>
+  const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
+  const cleanPassword = typeof mot_de_passe === 'string' ? mot_de_passe : ''
+
+  if (!cleanEmail || !cleanPassword) {
     throw new BadRequestError('Email et mot de passe requis', 'MISSING_CREDENTIALS')
   }
 
-  if (email !== adminEmail || mot_de_passe !== adminPassword) {
+  return { email: cleanEmail, mot_de_passe: cleanPassword }
+}
+
+function getJwtSecret(): string {
+  const secret = process.env['JWT_SECRET']
+  if (!secret) {
+    throw new AppError('Configuration JWT manquante', 500, 'CONFIG_MISSING')
+  }
+  return secret
+}
+
+export const loginSuperAdmin = async (req: Request, res: Response): Promise<void> => {
+  const { email, mot_de_passe } = sanitizeLoginBody(req.body)
+
+  const adminEmail = process.env['email_admin']
+  const adminPassword = process.env['Mot_de_passe_admin']
+  const jwtSecret = getJwtSecret()
+
+  if (!adminEmail || !adminPassword) {
+    throw new AppError('Configuration admin manquante', 500, 'CONFIG_MISSING')
+  }
+
+  const normalizedAdminEmail = adminEmail.trim().toLowerCase()
+
+  if (email !== normalizedAdminEmail || mot_de_passe !== adminPassword) {
     throw new UnauthorizedError('Email ou mot de passe incorrect', 'INVALID_CREDENTIALS')
   }
 
   const token = jwt.sign(
-    { email: adminEmail, role: 'SUPERADMIN' },
+    { email: normalizedAdminEmail, role: 'SUPERADMIN' },
     jwtSecret,
     { expiresIn: '24h' }
   )
@@ -33,26 +64,29 @@ export const loginSuperAdmin = async (req: Request, res: Response): Promise<void
     message: 'Connexion réussie',
     token,
     superadmin: {
-      email: adminEmail,
+      email: normalizedAdminEmail,
       role: 'SUPERADMIN',
     },
   })
 }
 
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
-  const { email, mot_de_passe } = req.body as { email: string; mot_de_passe: string }
+  const { email, mot_de_passe } = sanitizeLoginBody(req.body)
 
-  const jwtSecret = process.env['JWT_SECRET']
-  if (!jwtSecret) {
-    throw new AppError('Configuration JWT manquante', 500, 'CONFIG_MISSING')
-  }
+  const jwtSecret = getJwtSecret()
 
-  if (!email || !mot_de_passe) {
-    throw new BadRequestError('Email et mot de passe requis', 'MISSING_CREDENTIALS')
-  }
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: {
+      entreprise: {
+        select: { identifiant: true, is_active: true },
+      },
+    },
+  })
 
-  const user = await prisma.user.findUnique({ where: { email } })
-  if (!user) {
+  if (!user?.entreprise) {
+    // Obscure missing user/entreprise with the same timing as a real password check.
+    await bcrypt.compare(mot_de_passe, DUMMY_HASH)
     throw new UnauthorizedError('Email ou mot de passe incorrect', 'INVALID_CREDENTIALS')
   }
 
@@ -61,15 +95,17 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
     throw new UnauthorizedError('Email ou mot de passe incorrect', 'INVALID_CREDENTIALS')
   }
 
+  if (!user.entreprise.is_active) {
+    throw new ForbiddenError("L'entreprise est désactivée", 'ENTREPRISE_INACTIVE')
+  }
+
   if (user.is_block) {
     throw new ForbiddenError('Compte bloqué. Contactez votre administrateur.', 'ACCOUNT_BLOCKED')
   }
 
-  const entreprise = await prisma.entreprise.findUnique({ where: { id: user.entrepriseId } })
-  const identifiantEntreprise = entreprise?.identifiant ?? ''
+  const identifiantEntreprise = user.entreprise.identifiant
 
   const token = jwt.sign(
-<<<<<<< HEAD
     {
       id: user.id,
       email: user.email,
@@ -77,14 +113,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       entrepriseId: user.entrepriseId,
       matricule: user.matricule,
       identifiantEntreprise,
-      civilite: user.civilite,
-      genre: user.genre,
-      numero_passport: user.numero_passport,
-      date_expiration_passport: user.date_expiration_passport,
     },
-=======
-    { id: user.id, email: user.email, role: user.role, entrepriseId: user.entrepriseId, matricule: user.matricule, identifiantEntreprise },
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
     jwtSecret,
     { expiresIn: '24h' }
   )

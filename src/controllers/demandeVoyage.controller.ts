@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express'
+import type { PrismaPromise } from '@prisma/client'
 import prisma from '../lib/prismaClient'
 import { BadRequestError, NotFoundError, ForbiddenError, ConflictError } from '../utils/AppError'
 
@@ -317,8 +318,7 @@ export const approuverDemandeVoyage = async (req: Request, res: Response): Promi
     throw new ConflictError('Seules les demandes en attente peuvent être approuvées', 'STATUT_INVALIDE')
   }
 
-<<<<<<< HEAD
-  const operations: Promise<unknown>[] = [
+  const operations: PrismaPromise<any>[] = [
     prisma.demandeVoyage.update({
       where: { id },
       data: { statut: 'APPROUVEE', commentaire: commentaire ?? existing.commentaire },
@@ -364,45 +364,6 @@ export const approuverDemandeVoyage = async (req: Request, res: Response): Promi
     any | null
   ]
 
-=======
-  const demande = await prisma.demandeVoyage.update({
-    where: { id },
-    data: { statut: 'APPROUVEE', commentaire: commentaire ?? existing.commentaire },
-    include: {
-      user: { select: { id: true, prenom: true, nom: true, matricule: true, role: true } },
-      entreprise: { select: { id: true, nom: true, identifiant: true } },
-    },
-  })
-
-  const reservationBillet = await prisma.reservationBillet.create({
-    data: {
-      demandeVoyageId: demande.id,
-      allerRetour: demande.allerRetour,
-      numeroReservation: `RES-${Date.now()}`,
-      dateVolDepart: demande.dateDepart,
-      dateVolArrivee: null,
-      dateVolRetourDepart: demande.allerRetour ? demande.dateRetour : null,
-      dateVolRetourArrivee: null,
-      aeroportDepart: demande.depart,
-      aeroportArrivee: demande.arrive,
-      classe: demande.classe,
-      statut: 'EN_ATTENTE',
-    },
-  })
-
-  let reservationHotel = null
-  if (demande.hotel !== 'NON_INCLUS') {
-    reservationHotel = await prisma.reservationHotel.create({
-      data: {
-        demandeVoyageId: demande.id,
-        categorie: demande.hotel,
-        ville: demande.ville,
-        statut: 'EN_ATTENTE',
-      },
-    })
-  }
-
->>>>>>> 237a3e01a673dca26acb8f75d6a0fef8c514bac8
   res.status(200).json({ message: 'Demande approuvée', demande, reservationBillet, reservationHotel })
 }
 
