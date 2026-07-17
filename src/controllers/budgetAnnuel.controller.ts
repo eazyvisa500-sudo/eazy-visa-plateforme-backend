@@ -45,6 +45,9 @@ async function verifyManagerOwnership(
   budgetIdentifiant: string
 ): Promise<void> {
   if (user?.role !== 'MANAGER') return
+  if (!user.entrepriseId) {
+    throw new ForbiddenError('Aucune entreprise associée à ce compte')
+  }
   const entreprise = await prisma.entreprise.findUnique({ where: { id: user.entrepriseId } })
   if (!entreprise || entreprise.identifiant !== budgetIdentifiant) {
     throw new ForbiddenError()

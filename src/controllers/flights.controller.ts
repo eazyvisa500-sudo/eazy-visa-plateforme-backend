@@ -311,89 +311,208 @@ function validateGroupFlightDirectBody(body: unknown): GroupFlightDirectBody {
   return { selected_offers: selected_offers as string[], matricules: matricules as string[], passenger_ids: passenger_ids as string[] }
 }
 
+interface SearchFlightsBody {
+  origin: string
+  destination: string
+  departureDate: string
+  returnDate?: string | undefined
+  passengers: number
+  cabinClass: string
+  maxStops?: number | undefined
+  limit: number
+  offset: number
+}
+
+function validateSearchFlightsBody(body: unknown): SearchFlightsBody {
+  if (!body || typeof body !== 'object') {
+    throw new BadRequestError('Corps de requête invalide', 'INVALID_BODY')
+  }
+  const { origin, destination, departureDate, returnDate, passengers, cabinClass, maxStops, limit, offset } = body as Record<string, unknown>
+
+  if (
+    typeof origin !== 'string' || !origin.trim() ||
+    typeof destination !== 'string' || !destination.trim() ||
+    typeof departureDate !== 'string' || !departureDate.trim()
+  ) {
+    throw new BadRequestError('origin, destination et departureDate sont requis', 'MISSING_FIELDS')
+  }
+
+  const passengerCount = typeof passengers === 'number' && Number.isInteger(passengers) && passengers >= 1 && passengers <= 9 ? passengers : undefined
+  if (passengerCount === undefined) {
+    throw new BadRequestError('passengers doit être un entier entre 1 et 9', 'INVALID_PASSENGERS')
+  }
+
+  const cabin = typeof cabinClass === 'string' && cabinClass.trim() ? cabinClass : 'economy'
+
+  const maxConnections = typeof maxStops === 'number' && Number.isInteger(maxStops) && maxStops >= 0 ? maxStops : undefined
+  if (maxStops !== undefined && maxConnections === undefined) {
+    throw new BadRequestError('maxStops doit être un entier positif', 'INVALID_MAX_STOPS')
+  }
+
+  const limitNumber = typeof limit === 'number' && Number.isInteger(limit) && limit > 0 ? limit : 20
+  const offsetNumber = typeof offset === 'number' && Number.isInteger(offset) && offset >= 0 ? offset : 0
+
+  return {
+    origin,
+    destination,
+    departureDate,
+    returnDate: typeof returnDate === 'string' && returnDate.trim() ? returnDate : undefined,
+    passengers: passengerCount,
+    cabinClass: cabin,
+    maxStops: maxConnections,
+    limit: limitNumber,
+    offset: offsetNumber,
+  }
+}
+
+interface SearchFlightsAdvancedBody {
+  dateDepart: string
+  dateRetour?: string | undefined
+  aeroportDepart: string
+  aeroportArrivee: string
+  classe: string
+  nombrePassenger: number
+}
+
+function validateSearchFlightsAdvancedBody(body: unknown): SearchFlightsAdvancedBody {
+  if (!body || typeof body !== 'object') {
+    throw new BadRequestError('Corps de requête invalide', 'INVALID_BODY')
+  }
+  const { dateDepart, dateRetour, aeroportDepart, aeroportArrivee, classe, nombrePassenger } = body as Record<string, unknown>
+
+  if (
+    typeof dateDepart !== 'string' || !dateDepart.trim() ||
+    typeof aeroportDepart !== 'string' || !aeroportDepart.trim() ||
+    typeof aeroportArrivee !== 'string' || !aeroportArrivee.trim() ||
+    typeof classe !== 'string' || !classe.trim()
+  ) {
+    throw new BadRequestError('dateDepart, aeroportDepart, aeroportArrivee et classe sont requis', 'MISSING_FIELDS')
+  }
+
+  const passengerCount = typeof nombrePassenger === 'number' && Number.isInteger(nombrePassenger) && nombrePassenger >= 1 && nombrePassenger <= 9 ? nombrePassenger : undefined
+  if (passengerCount === undefined) {
+    throw new BadRequestError('nombrePassenger doit être un entier entre 1 et 9', 'INVALID_PASSENGER_COUNT')
+  }
+
+  return {
+    dateDepart,
+    dateRetour: typeof dateRetour === 'string' && dateRetour.trim() ? dateRetour : undefined,
+    aeroportDepart,
+    aeroportArrivee,
+    classe,
+    nombrePassenger: passengerCount,
+  }
+}
+
+interface DuffelSlice {
+  origin: string
+  destination: string
+  departure_date: string
+}
+
+function buildDuffelOfferRequest(params: {
+  origin: string
+  destination: string
+  departureDate: string
+  returnDate?: string | undefined
+  passengerCount: number
+  cabinClass: string
+  maxStops?: number | undefined
+}): any {
+  const slices: DuffelSlice[] = [
+    { origin: params.origin, destination: params.destination, departure_date: params.departureDate },
+  ]
+
+  if (params.returnDate) {
+    slices.push({ origin: params.destination, destination: params.origin, departure_date: params.returnDate })
+  }
+
+  const offerRequestParams: any = {
+    slices,
+    passengers: Array.from({ length: params.passengerCount }, () => ({ type: 'adult' })),
+    cabin_class: params.cabinClass,
+  }
+
+  if (params.maxStops !== undefined) {
+    offerRequestParams.max_connections = params.maxStops
+  }
+
+  return offerRequestParams
+}
+
+function handleSearchError(res: Response, error: unknown, message: string): void {
+  if (error instanceof AppError) {
+    res.status(error.statusCode).json({ message: error.message, error: error.message, errorDetails: null })
+    return
+  }
+
+  console.error(message, { error: error instanceof Error ? error.message : String(error), requestBody: null })
+
+  res.status(500).json({
+    message,
+    error: error instanceof Error ? error.message : String(error),
+    errorDetails: error,
+  })
+}
+
+function handleGetOrderError(res: Response, error: unknown, message: string): void {
+  if (error instanceof AppError) {
+    res.status(error.statusCode).json({ message: error.message, error: error.message, errorDetails: null, duffelErrors: [], duffelMeta: {} })
+    return
+  }
+
+  const duffelError = error as any
+  const duffelErrors = duffelError?.errors || []
+  const duffelMeta = duffelError?.meta || {}
+  const status = typeof duffelMeta?.status === 'number' ? duffelMeta.status : 500
+
+  console.error(message, { error: error instanceof Error ? error.message : String(error), duffelErrors, duffelMeta })
+
+  res.status(status).json({
+    message,
+    error: error instanceof Error ? error.message : String(error),
+    errorDetails: error,
+    duffelErrors,
+    duffelMeta,
+  })
+}
+
+function handleAirportSuggestionError(res: Response, error: unknown): void {
+  if (error instanceof AppError) {
+    res.status(error.statusCode).json({ success: false, message: error.message, error: error.message })
+    return
+  }
+
+  console.error('Erreur lors de la recherche des aéroports :', error)
+
+  res.status(500).json({
+    success: false,
+    message: 'Erreur interne du serveur.',
+    error: error instanceof Error ? error.message : error,
+  })
+}
+
 export const searchFlights = async (req: Request, res: Response): Promise<void> => {
   try {
-    const {
+    const { origin, destination, departureDate, returnDate, passengers, cabinClass, maxStops, limit, offset } =
+      validateSearchFlightsBody(req.body)
+
+    const offerRequestParams = buildDuffelOfferRequest({
       origin,
       destination,
       departureDate,
       returnDate,
-      passengers = 1,
-      cabinClass = 'economy',
-      maxStops,
-      limit = 20,
-      offset = 0,
-    } = req.body as {
-      origin?: string
-      destination?: string
-      departureDate?: string
-      returnDate?: string
-      passengers?: number
-      cabinClass?: string
-      maxStops?: number
-      limit?: number
-      offset?: number
-    }
-
-    if (!origin || !destination || !departureDate) {
-      res.status(400).json({ message: 'origin, destination et departureDate sont requis' })
-      return
-    }
-
-    if (typeof passengers !== 'number' || !Number.isInteger(passengers) || passengers < 1 || passengers > 9) {
-      res.status(400).json({ message: 'passengers doit être un entier entre 1 et 9' })
-      return
-    }
-
-    console.log('Recherche de vols avec SDK Duffel:', {
-      origin,
-      destination,
-      departureDate,
-      returnDate,
-      passengers,
+      passengerCount: passengers,
       cabinClass,
       maxStops,
-      limit,
-      offset,
     })
 
-    const slices: any[] = [
-      {
-        origin: origin,
-        destination: destination,
-        departure_date: departureDate,
-      },
-    ]
-
-    if (returnDate) {
-      slices.push({
-        origin: destination,
-        destination: origin,
-        departure_date: returnDate,
-      })
-    }
-
-    const offerRequestParams: any = {
-      slices,
-      passengers: Array.from({ length: passengers }, () => ({ type: 'adult' })),
-      cabin_class: cabinClass,
-    }
-
-    if (maxStops !== undefined) {
-      offerRequestParams.max_connections = maxStops
-    }
-
     const offerRequest = await duffel.offerRequests.create(offerRequestParams)
-
-    console.log('Offer Request créé:', offerRequest.data.id)
 
     const offers = await duffel.offers.list({
       offer_request_id: offerRequest.data.id,
     })
 
-    console.log('Offres récupérées:', offers.data.length)
-
-    // Pagination
     const paginatedOffers = offers.data.slice(offset, offset + limit)
 
     res.status(200).json({
@@ -407,17 +526,7 @@ export const searchFlights = async (req: Request, res: Response): Promise<void> 
       },
     })
   } catch (error) {
-    console.error('Error searching flights with Duffel SDK:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      errorDetails: error,
-      requestBody: req.body,
-    })
-    res.status(500).json({
-      message: 'Erreur lors de la recherche de vols',
-      error: error instanceof Error ? error.message : String(error),
-      errorDetails: error,
-    })
+    handleSearchError(res, error, 'Erreur lors de la recherche de vols')
   }
 }
 
@@ -990,33 +1099,11 @@ export const getOrder = async (req: Request, res: Response): Promise<void> => {
       return
     }
 
-    console.log('Récupération de la commande Duffel:', id)
-
     const order = await duffel.orders.get(id)
-
-    console.log('Commande récupérée:', order.data.id)
 
     res.status(200).json(order.data)
   } catch (error) {
-    console.error('Error getting order from Duffel SDK:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      errorDetails: error,
-      orderId: req.params.id,
-    })
-
-    // Extraire les détails de l'erreur Duffel si disponibles
-    const duffelError = error as any
-    const duffelErrors = duffelError?.errors || []
-    const duffelMeta = duffelError?.meta || {}
-
-    res.status(500).json({
-      message: 'Erreur lors de la récupération de la commande',
-      error: error instanceof Error ? error.message : String(error),
-      errorDetails: error,
-      duffelErrors,
-      duffelMeta,
-    })
+    handleGetOrderError(res, error, 'Erreur lors de la récupération de la commande')
   }
 }
 
@@ -1166,71 +1253,23 @@ export const confirmOrderCancellation = async (req: Request, res: Response): Pro
 
 export const searchFlightsAdvanced = async (req: Request, res: Response): Promise<void> => {
   try {
-    const {
-      dateDepart,
-      dateRetour,
-      aeroportDepart,
-      aeroportArrivee,
-      classe,
-      nombrePassenger,
-    } = req.body as {
-      dateDepart?: string
-      dateRetour?: string
-      aeroportDepart?: string
-      aeroportArrivee?: string
-      classe?: string
-      nombrePassenger?: number
-    }
+    const { dateDepart, dateRetour, aeroportDepart, aeroportArrivee, classe, nombrePassenger } =
+      validateSearchFlightsAdvancedBody(req.body)
 
-    if (!dateDepart || !aeroportDepart || !aeroportArrivee || !classe || !nombrePassenger) {
-      res.status(400).json({
-        message: 'dateDepart, aeroportDepart, aeroportArrivee, classe et nombrePassenger sont requis',
-      })
-      return
-    }
-
-    console.log('Recherche de vols avancée avec SDK Duffel:', {
-      dateDepart,
-      dateRetour,
-      aeroportDepart,
-      aeroportArrivee,
-      classe,
-      nombrePassenger,
+    const offerRequestParams = buildDuffelOfferRequest({
+      origin: aeroportDepart,
+      destination: aeroportArrivee,
+      departureDate: dateDepart,
+      returnDate: dateRetour,
+      passengerCount: nombrePassenger,
+      cabinClass: classe,
     })
 
-    const slices: any[] = [
-      {
-        origin: aeroportDepart,
-        destination: aeroportArrivee,
-        departure_date: dateDepart,
-      },
-    ]
-
-    if (dateRetour) {
-      slices.push({
-        origin: aeroportArrivee,
-        destination: aeroportDepart,
-        departure_date: dateRetour,
-      })
-    }
-
-    const passengers = Array.from({ length: nombrePassenger }, () => ({ type: 'adult' }))
-
-    const offerRequestParams: any = {
-      slices,
-      passengers,
-      cabin_class: classe,
-    }
-
     const offerRequest = await duffel.offerRequests.create(offerRequestParams)
-
-    console.log('Offer Request créé:', offerRequest.data.id)
 
     const offers = await duffel.offers.list({
       offer_request_id: offerRequest.data.id,
     })
-
-    console.log('Offres récupérées:', offers.data.length)
 
     res.status(200).json({
       offer_request_id: offerRequest.data.id,
@@ -1238,17 +1277,7 @@ export const searchFlightsAdvanced = async (req: Request, res: Response): Promis
       total: offers.data.length,
     })
   } catch (error) {
-    console.error('Error searching flights with Duffel SDK:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      errorDetails: error,
-      requestBody: req.body,
-    })
-    res.status(500).json({
-      message: 'Erreur lors de la recherche de vols',
-      error: error instanceof Error ? error.message : String(error),
-      errorDetails: error,
-    })
+    handleSearchError(res, error, 'Erreur lors de la recherche de vols')
   }
 }
 
@@ -1257,50 +1286,40 @@ export const searchAirportSuggestion = async (
   res: Response
 ): Promise<void> => {
   try {
-    const query = req.query.query as string;
+    const query = req.query.query as string
 
     if (!query) {
       res.status(400).json({
         success: false,
         message: "Le paramètre 'query' est requis.",
-      });
-      return;
+      })
+      return
     }
 
-    console.log("Recherche de suggestions d'aéroport :", query);
-
     const response = await fetch(
-      `https://api.duffel.com/places/suggestions?query=${encodeURIComponent(
-        query
-      )}`,
+      `https://api.duffel.com/places/suggestions?query=${encodeURIComponent(query)}`,
       {
-        method: "GET",
+        method: 'GET',
         headers: {
-          Accept: "application/json",
-          "Duffel-Version": "v2",
+          Accept: 'application/json',
+          'Duffel-Version': 'v2',
           Authorization: `Bearer ${process.env.DUFFEL_API_KEY}`,
         },
       }
-    );
+    )
 
-    const data = await response.json();
+    const data = await response.json()
 
     if (!response.ok) {
-      res.status(response.status).json(data);
-      return;
+      res.status(response.status).json(data)
+      return
     }
 
     res.status(200).json({
       success: true,
       data,
-    });
+    })
   } catch (error) {
-    console.error("Erreur lors de la recherche des aéroports :", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Erreur interne du serveur.",
-      error: error instanceof Error ? error.message : error,
-    });
+    handleAirportSuggestionError(res, error)
   }
-};
+}
