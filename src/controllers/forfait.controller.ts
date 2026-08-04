@@ -1,318 +1,371 @@
-import type { Request, Response } from 'express'
-import prisma from '../lib/prismaClient'
+import type { Request, Response } from "express";
+import prisma from "../lib/prismaClient";
+import {
+  BadRequestError,
+  NotFoundError,
+  ConflictError,
+} from "../utils/AppError";
+import {
+  parseIdParam,
+  parsePositiveInt,
+  parseNonNegativeInt,
+} from "../utils/validation";
 
-export const createForfait = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { entrepriseId, nombre_user_autorise } = req.body as {
-      entrepriseId?: number
-      nombre_user_autorise?: number
-    }
+export const createForfait = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const body = req.body as Record<string, unknown>;
+  const entrepriseId = parsePositiveInt(body.entrepriseId, "entrepriseId");
+  const nombre_user_autorise = parsePositiveInt(
+    body.nombre_user_autorise,
+    "nombre_user_autorise",
+  );
 
-    if (!entrepriseId || !nombre_user_autorise) {
-      res.status(400).json({ message: 'entrepriseId et nombre_user_autorise sont requis' })
-      return
-    }
+  // Vérifier que l'entreprise existe
+  const entreprise = await prisma.entreprise.findUnique({
+    where: { id: entrepriseId },
+  });
 
-    // Vérifier que l'entreprise existe
-    const entreprise = await prisma.entreprise.findUnique({
-      where: { id: entrepriseId },
-    })
+  if (!entreprise) {
+    throw new NotFoundError("Entreprise");
+  }
 
-    if (!entreprise) {
-      res.status(404).json({ message: 'Entreprise non trouvée' })
-      return
-    }
+  // Vérifier si un forfait existe déjà pour cette entreprise
+  const existingForfait = await prisma.forfait.findUnique({
+    where: { entrepriseId },
+  });
 
-    // Vérifier si un forfait existe déjà pour cette entreprise
-    const existingForfait = await prisma.forfait.findUnique({
-      where: { entrepriseId },
-    })
+  if (existingForfait) {
+    throw new ConflictError(
+      "Un forfait existe déjà pour cette entreprise",
+      "FORFAIT_EXISTS",
+    );
+  }
 
-    if (existingForfait) {
-      res.status(409).json({ message: 'Un forfait existe déjà pour cette entreprise' })
-      return
-    }
-
-    const forfait = await prisma.forfait.create({
-      data: {
-        entrepriseId,
-        nombre_user_autorise,
-        nombre_user_actuel: 0,
-      },
-      include: {
-        entreprise: {
-          select: {
-            id: true,
-            nom: true,
-            identifiant: true,
-          },
+  const forfait = await prisma.forfait.create({
+    data: {
+      entrepriseId,
+      nombre_user_autorise,
+      nombre_user_actuel: 0,
+    },
+    include: {
+      entreprise: {
+        select: {
+          id: true,
+          nom: true,
+          identifiant: true,
         },
       },
-    })
+    },
+  });
 
-    res.status(201).json({ message: 'Forfait créé avec succès', forfait })
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la création du forfait', error: error instanceof Error ? error.message : String(error) })
-  }
-}
+  res.status(201).json({ message: "Forfait créé avec succès", forfait });
+};
 
-export const getAllForfaits = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const forfaits = await prisma.forfait.findMany({
-      include: {
-        entreprise: {
-          select: {
-            id: true,
-            nom: true,
-            identifiant: true,
-          },
+export const getAllForfaits = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const forfaits = await prisma.forfait.findMany({
+    include: {
+      entreprise: {
+        select: {
+          id: true,
+          nom: true,
+          identifiant: true,
         },
       },
-    })
+    },
+  });
 
-    res.status(200).json({ total: forfaits.length, forfaits })
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la récupération des forfaits', error: error instanceof Error ? error.message : String(error) })
-  }
-}
+  res.status(200).json({ total: forfaits.length, forfaits });
+};
 
-export const getForfaitById = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params
+export const getForfaitById = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const id = parseIdParam(req.params["id"]);
 
-    const forfait = await prisma.forfait.findUnique({
-      where: { id: Number(id) },
-      include: {
-        entreprise: {
-          select: {
-            id: true,
-            nom: true,
-            identifiant: true,
-          },
+  const forfait = await prisma.forfait.findUnique({
+    where: { id },
+    include: {
+      entreprise: {
+        select: {
+          id: true,
+          nom: true,
+          identifiant: true,
         },
       },
-    })
+    },
+  });
 
-    if (!forfait) {
-      res.status(404).json({ message: 'Forfait non trouvé' })
-      return
-    }
-
-    res.status(200).json(forfait)
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la récupération du forfait', error: error instanceof Error ? error.message : String(error) })
+  if (!forfait) {
+    throw new NotFoundError("Forfait");
   }
-}
 
-export const getForfaitByEntreprise = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { entrepriseId } = req.params
+  res.status(200).json(forfait);
+};
 
-    const forfait = await prisma.forfait.findUnique({
-      where: { entrepriseId: Number(entrepriseId) },
-      include: {
-        entreprise: {
-          select: {
-            id: true,
-            nom: true,
-            identifiant: true,
-          },
+export const getForfaitByEntreprise = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const entrepriseId = parseIdParam(req.params["entrepriseId"]);
+
+  const forfait = await prisma.forfait.findUnique({
+    where: { entrepriseId },
+    include: {
+      entreprise: {
+        select: {
+          id: true,
+          nom: true,
+          identifiant: true,
         },
       },
-    })
+    },
+  });
 
-    if (!forfait) {
-      res.status(404).json({ message: 'Aucun forfait trouvé pour cette entreprise' })
-      return
-    }
-
-    res.status(200).json(forfait)
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la récupération du forfait', error: error instanceof Error ? error.message : String(error) })
+  if (!forfait) {
+    throw new NotFoundError("Forfait");
   }
-}
 
-export const updateForfait = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params
-    const { nombre_user_autorise, nombre_user_actuel } = req.body as {
-      nombre_user_autorise?: number
-      nombre_user_actuel?: number
+  res.status(200).json(forfait);
+};
+
+export const updateForfait = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const id = parseIdParam(req.params["id"]);
+  const body = req.body as Record<string, unknown>;
+  const nombre_user_autorise =
+    body.nombre_user_autorise === undefined
+      ? undefined
+      : parsePositiveInt(body.nombre_user_autorise, "nombre_user_autorise");
+  const nombre_user_actuel =
+    body.nombre_user_actuel === undefined
+      ? undefined
+      : parseNonNegativeInt(body.nombre_user_actuel, "nombre_user_actuel");
+
+  const forfait = await prisma.forfait.findUnique({
+    where: { id },
+  });
+
+  if (!forfait) {
+    throw new NotFoundError("Forfait");
+  }
+
+  // Si nombre_user_actuel est fourni, vérifier qu'il ne dépasse pas nombre_user_autorise
+  if (nombre_user_actuel !== undefined) {
+    const maxUsers = nombre_user_autorise ?? forfait.nombre_user_autorise;
+    if (nombre_user_actuel > maxUsers) {
+      throw new BadRequestError(
+        "Le nombre d'utilisateurs actuels ne peut pas dépasser le nombre autorisé",
+        "USER_LIMIT_EXCEEDED",
+      );
     }
+  }
 
-    const forfait = await prisma.forfait.findUnique({
-      where: { id: Number(id) },
-    })
-
-    if (!forfait) {
-      res.status(404).json({ message: 'Forfait non trouvé' })
-      return
-    }
-
-    // Si nombre_user_actuel est fourni, vérifier qu'il ne dépasse pas nombre_user_autorise
-    if (nombre_user_actuel !== undefined) {
-      const maxUsers = nombre_user_autorise ?? forfait.nombre_user_autorise
-      if (nombre_user_actuel > maxUsers) {
-        res.status(400).json({ message: 'Le nombre d\'utilisateurs actuels ne peut pas dépasser le nombre autorisé' })
-        return
-      }
-    }
-
-    const updatedForfait = await prisma.forfait.update({
-      where: { id: Number(id) },
-      data: {
-        ...(nombre_user_autorise !== undefined && { nombre_user_autorise }),
-        ...(nombre_user_actuel !== undefined && { nombre_user_actuel }),
-      },
-      include: {
-        entreprise: {
-          select: {
-            id: true,
-            nom: true,
-            identifiant: true,
-          },
+  const updatedForfait = await prisma.forfait.update({
+    where: { id },
+    data: {
+      ...(nombre_user_autorise !== undefined && { nombre_user_autorise }),
+      ...(nombre_user_actuel !== undefined && { nombre_user_actuel }),
+    },
+    include: {
+      entreprise: {
+        select: {
+          id: true,
+          nom: true,
+          identifiant: true,
         },
       },
-    })
+    },
+  });
 
-    res.status(200).json({ message: 'Forfait mis à jour avec succès', forfait: updatedForfait })
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la mise à jour du forfait', error: error instanceof Error ? error.message : String(error) })
+  res.status(200).json({
+    message: "Forfait mis à jour avec succès",
+    forfait: updatedForfait,
+  });
+};
+
+export const increaseAuthorizedUsers = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const id = parseIdParam(req.params["id"]);
+  const body = req.body as Record<string, unknown>;
+  const amount =
+    body.amount === undefined ? 1 : parsePositiveInt(body.amount, "amount");
+
+  const forfait = await prisma.forfait.findUnique({
+    where: { id },
+  });
+
+  if (!forfait) {
+    throw new NotFoundError("Forfait");
   }
-}
 
-export const incrementUserCount = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params
-
-    const forfait = await prisma.forfait.findUnique({
-      where: { id: Number(id) },
-    })
-
-    if (!forfait) {
-      res.status(404).json({ message: 'Forfait non trouvé' })
-      return
-    }
-
-    if (forfait.nombre_user_actuel >= forfait.nombre_user_autorise) {
-      res.status(400).json({ message: 'Le nombre maximum d\'utilisateurs autorisés est atteint' })
-      return
-    }
-
-    const updatedForfait = await prisma.forfait.update({
-      where: { id: Number(id) },
-      data: {
-        nombre_user_actuel: forfait.nombre_user_actuel + 1,
-      },
-      include: {
-        entreprise: {
-          select: {
-            id: true,
-            nom: true,
-            identifiant: true,
-          },
+  const updatedForfait = await prisma.forfait.update({
+    where: { id },
+    data: {
+      nombre_user_autorise: forfait.nombre_user_autorise + amount,
+    },
+    include: {
+      entreprise: {
+        select: {
+          id: true,
+          nom: true,
+          identifiant: true,
         },
       },
-    })
+    },
+  });
 
-    res.status(200).json({ message: 'Nombre d\'utilisateurs incrémenté avec succès', forfait: updatedForfait })
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de l\'incrémentation du nombre d\'utilisateurs', error: error instanceof Error ? error.message : String(error) })
+  res.status(200).json({
+    message: `Nombre d'utilisateurs autorisés augmenté de ${amount}`,
+    forfait: updatedForfait,
+  });
+};
+
+export const incrementUserCount = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const id = parseIdParam(req.params["id"]);
+
+  const forfait = await prisma.forfait.findUnique({
+    where: { id },
+  });
+
+  if (!forfait) {
+    throw new NotFoundError("Forfait");
   }
-}
 
-export const decrementUserCount = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params
+  if (forfait.nombre_user_actuel >= forfait.nombre_user_autorise) {
+    throw new BadRequestError(
+      "Le nombre maximum d'utilisateurs autorisés est atteint",
+      "USER_LIMIT_REACHED",
+    );
+  }
 
-    const forfait = await prisma.forfait.findUnique({
-      where: { id: Number(id) },
-    })
-
-    if (!forfait) {
-      res.status(404).json({ message: 'Forfait non trouvé' })
-      return
-    }
-
-    if (forfait.nombre_user_actuel <= 0) {
-      res.status(400).json({ message: 'Le nombre d\'utilisateurs actuels ne peut pas être négatif' })
-      return
-    }
-
-    const updatedForfait = await prisma.forfait.update({
-      where: { id: Number(id) },
-      data: {
-        nombre_user_actuel: forfait.nombre_user_actuel - 1,
-      },
-      include: {
-        entreprise: {
-          select: {
-            id: true,
-            nom: true,
-            identifiant: true,
-          },
+  const updatedForfait = await prisma.forfait.update({
+    where: { id },
+    data: {
+      nombre_user_actuel: forfait.nombre_user_actuel + 1,
+    },
+    include: {
+      entreprise: {
+        select: {
+          id: true,
+          nom: true,
+          identifiant: true,
         },
       },
-    })
+    },
+  });
 
-    res.status(200).json({ message: 'Nombre d\'utilisateurs décrémenté avec succès', forfait: updatedForfait })
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la décrémentation du nombre d\'utilisateurs', error: error instanceof Error ? error.message : String(error) })
+  res.status(200).json({
+    message: "Nombre d'utilisateurs incrémenté avec succès",
+    forfait: updatedForfait,
+  });
+};
+
+export const decrementUserCount = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const id = parseIdParam(req.params["id"]);
+
+  const forfait = await prisma.forfait.findUnique({
+    where: { id },
+  });
+
+  if (!forfait) {
+    throw new NotFoundError("Forfait");
   }
-}
 
-export const deleteForfait = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params
-
-    const forfait = await prisma.forfait.findUnique({
-      where: { id: Number(id) },
-    })
-
-    if (!forfait) {
-      res.status(404).json({ message: 'Forfait non trouvé' })
-      return
-    }
-
-    await prisma.forfait.delete({
-      where: { id: Number(id) },
-    })
-
-    res.status(200).json({ message: 'Forfait supprimé avec succès' })
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la suppression du forfait', error: error instanceof Error ? error.message : String(error) })
+  if (forfait.nombre_user_actuel <= 0) {
+    throw new BadRequestError(
+      "Le nombre d'utilisateurs actuels ne peut pas être négatif",
+      "USER_COUNT_NEGATIVE",
+    );
   }
-}
 
-export const getForfaitByCurrentUser = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const user = req.user
-
-    if (!user || !user.entrepriseId) {
-      res.status(400).json({ message: 'Utilisateur non authentifié ou sans entreprise' })
-      return
-    }
-
-    const forfait = await prisma.forfait.findUnique({
-      where: { entrepriseId: user.entrepriseId },
-      include: {
-        entreprise: {
-          select: {
-            id: true,
-            nom: true,
-            identifiant: true,
-          },
+  const updatedForfait = await prisma.forfait.update({
+    where: { id },
+    data: {
+      nombre_user_actuel: forfait.nombre_user_actuel - 1,
+    },
+    include: {
+      entreprise: {
+        select: {
+          id: true,
+          nom: true,
+          identifiant: true,
         },
       },
-    })
+    },
+  });
 
-    if (!forfait) {
-      res.status(404).json({ message: 'Aucun forfait trouvé pour votre entreprise' })
-      return
-    }
+  res.status(200).json({
+    message: "Nombre d'utilisateurs décrémenté avec succès",
+    forfait: updatedForfait,
+  });
+};
 
-    res.status(200).json(forfait)
-  } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la récupération du forfait', error: error instanceof Error ? error.message : String(error) })
+export const deleteForfait = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const id = parseIdParam(req.params["id"]);
+
+  const forfait = await prisma.forfait.findUnique({
+    where: { id },
+  });
+
+  if (!forfait) {
+    throw new NotFoundError("Forfait");
   }
-}
+
+  await prisma.forfait.delete({
+    where: { id },
+  });
+
+  res.status(200).json({ message: "Forfait supprimé avec succès" });
+};
+
+export const getForfaitByCurrentUser = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const user = req.user;
+
+  if (!user || !user.entrepriseId) {
+    throw new BadRequestError(
+      "Utilisateur non authentifié ou sans entreprise",
+      "AUTH_REQUIRED",
+    );
+  }
+
+  const forfait = await prisma.forfait.findUnique({
+    where: { entrepriseId: user.entrepriseId },
+    include: {
+      entreprise: {
+        select: {
+          id: true,
+          nom: true,
+          identifiant: true,
+        },
+      },
+    },
+  });
+
+  if (!forfait) {
+    throw new NotFoundError("Forfait");
+  }
+
+  res.status(200).json(forfait);
+};

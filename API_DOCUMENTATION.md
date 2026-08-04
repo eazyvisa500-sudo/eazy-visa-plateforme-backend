@@ -556,7 +556,7 @@ Authorization: Bearer <token_superadmin>
   "pays": "Sénégal",
   "region": "Dakar",
   "ville": "Dakar",
-  "logo": "https://cdn.example.workers.dev/logos/acme.png",
+  "logo": "uploads/logos/acme.png",
   "nombre_user_autorise": 50
 }
 ```
@@ -568,10 +568,10 @@ Authorization: Bearer <token_superadmin>
 | pays | string | Oui | Pays |
 | region | string | Oui | Région |
 | ville | string | Oui | Ville |
-| logo | string | Non | URL du logo (optionnel) |
+| logo | string / file | Non | Fichier image (multipart) ou chemin local du logo (optionnel) |
 | nombre_user_autorise | number | Oui | Nombre d'utilisateurs autorisés par le forfait |
 
-> `logo` est **optionnel** — URL Cloudflare de la photo hébergée.
+> `logo` est **optionnel**. En `multipart/form-data` il s'agit du fichier image uploadé ; en JSON il peut s'agir d'un chemin local existant.
 
 **Réponse 201**
 ```json
@@ -586,7 +586,7 @@ Authorization: Bearer <token_superadmin>
     "pays": "Sénégal",
     "region": "Dakar",
     "ville": "Dakar",
-    "logo": "https://cdn.example.workers.dev/logos/acme.png",
+    "logo": "uploads/logos/acme.png",
     "is_active": true,
     "createdAt": "2026-06-30T09:00:00.000Z",
     "updatedAt": "2026-06-30T09:00:00.000Z"
@@ -710,7 +710,7 @@ Modifier les informations d'une entreprise. Tous les champs sont optionnels.
   "pays": "Sénégal",
   "region": "Thiès",
   "ville": "Thiès",
-  "logo": "https://cdn.example.workers.dev/logos/new.png"
+  "logo": "uploads/logos/new.png"
 }
 ```
 
@@ -726,7 +726,7 @@ Modifier les informations d'une entreprise. Tous les champs sont optionnels.
     "pays": "Sénégal",
     "region": "Thiès",
     "ville": "Thiès",
-    "logo": "https://cdn.example.workers.dev/logos/new.png",
+    "logo": "uploads/logos/new.png",
     "is_active": true,
     "createdAt": "2026-06-30T09:00:00.000Z",
     "updatedAt": "2026-06-30T09:30:00.000Z"
@@ -743,7 +743,7 @@ Modifier les informations d'une entreprise. Tous les champs sont optionnels.
 
 ### GET `/api/entreprises/:id/logo`
 
-Obtenir une URL signée (valide 1h) pour afficher le logo de l'entreprise.
+Obtenir l'URL publique du logo de l'entreprise enregistré localement.
 
 **Accès** : SUPERADMIN
 
@@ -752,7 +752,7 @@ Obtenir une URL signée (valide 1h) pour afficher le logo de l'entreprise.
 **Réponse 200**
 ```json
 {
-  "logo_url": "https://4abec97e.r2.cloudflarestorage.com/logos/entreprises/1-uuid.png?X-Amz-Signature=..."
+  "logo_url": "http://localhost:3000/uploads/logos/1-uuid.png"
 }
 ```
 
@@ -768,8 +768,8 @@ Obtenir une URL signée (valide 1h) pour afficher le logo de l'entreprise.
 
 ### PATCH `/api/entreprises/:id/logo`
 
-Uploader ou remplacer le logo d'une entreprise. Hébergé sur **Cloudflare R2** (accès sécurisé par URL signée).  
-L'ancien logo est automatiquement supprimé du bucket.
+Uploader ou remplacer le logo d'une entreprise. Le fichier est enregistré localement dans `uploads/logos/`.  
+L'ancien logo est automatiquement supprimé du disque.
 
 **Accès** : SUPERADMIN
 
@@ -783,18 +783,18 @@ L'ancien logo est automatiquement supprimé du bucket.
 ```json
 {
   "message": "Logo mis à jour avec succès",
-  "logo_url": "https://4abec97e.r2.cloudflarestorage.com/logos/entreprises/1-uuid.png?X-Amz-Signature=...",
+  "logo_url": "http://localhost:3000/uploads/logos/1-uuid.png",
   "entreprise": {
     "id": 1,
     "nom": "Acme Corp",
-    "logo": "logos/entreprises/1-uuid.png",
-    "logo_url": "https://4abec97e.r2.cloudflarestorage.com/..."
+    "logo": "uploads/logos/1-uuid.png",
+    "logo_url": "http://localhost:3000/uploads/logos/1-uuid.png"
   }
 }
 ```
 
-> `logo` en base = clé R2 (chemin interne).  
-> `logo_url` = URL signée valide **1 heure**, à utiliser pour afficher l'image.
+> `logo` en base = chemin relatif du fichier (`uploads/logos/...`).  
+> `logo_url` = URL publique locale, par ex. `http://localhost:3000/uploads/logos/1-uuid.png`.
 
 **Erreurs**
 | Code | Message |
@@ -2518,6 +2518,54 @@ Décrémenter le nombre d'utilisateurs actuels d'un forfait.
 | Code | Message |
 |---|---|
 | 400 | Le nombre d'utilisateurs actuels ne peut pas être négatif |
+| 404 | Forfait non trouvé |
+| 500 | Erreur serveur |
+
+---
+
+### PATCH `/api/forfaits/:id/augmenter`
+
+Augmenter le nombre d'utilisateurs autorisés d'un forfait d'un certain montant.
+
+**Paramètre URL** : `id`
+
+**Body**
+```json
+{
+  "amount": 5
+}
+```
+
+| Paramètre | Type | Requis | Description |
+|---|---|---|---|
+| amount | number | Non | Montant à ajouter au nombre d'utilisateurs autorisés (défaut : 1) |
+
+> `amount` doit être un entier positif. S'il est omis, le forfait est augmenté de **1**.
+
+**Réponse 200**
+```json
+{
+  "message": "Nombre d'utilisateurs autorisés augmenté de 5",
+  "forfait": {
+    "id": 1,
+    "entrepriseId": 1,
+    "nombre_user_autorise": 55,
+    "nombre_user_actuel": 24,
+    "createdAt": "2026-07-10T10:00:00.000Z",
+    "updatedAt": "2026-07-10T10:37:00.000Z",
+    "entreprise": {
+      "id": 1,
+      "nom": "Ma Entreprise",
+      "identifiant": "ENT-001"
+    }
+  }
+}
+```
+
+**Erreurs**
+| Code | Message |
+|---|---|
+| 400 | Le montant doit être un nombre entier positif |
 | 404 | Forfait non trouvé |
 | 500 | Erreur serveur |
 
