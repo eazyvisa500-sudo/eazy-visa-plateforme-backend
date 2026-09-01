@@ -12,9 +12,8 @@ dist/
 
 # Environment variables
 .env
-.env.example
 .env.*
-.env.*
+!.env.example
 
 # Logs
 logs/
